@@ -1,0 +1,407 @@
+/* Estilos básicos e cores do sistema. */
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: #f2f5f7;
+    color: #243746;
+    font-family: Arial, sans-serif;
+    font-size: 14px;
+}
+
+h1 {
+    margin: 0 0 24px;
+    font-size: 26px;
+    font-weight: bold;
+}
+
+h2 {
+    margin: 0 0 12px;
+    font-size: 20px;
+    font-weight: bold;
+}
+
+h3 {
+    margin: 24px 0 12px;
+    font-size: 15px;
+    font-weight: bold;
+}
+
+p {
+    margin: 12px 0;
+    line-height: 1.6;
+}
+
+button,
+input,
+select,
+textarea {
+    font: inherit;
+}
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    font-weight: bold;
+}
+
+input,
+select,
+textarea {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #cbd5dd;
+    border-radius: 5px;
+    background: white;
+    color: #243746;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+    outline: 2px solid #168a72;
+    outline-offset: 1px;
+}
+
+[hidden] {
+    display: none !important;
+}
+
+small {
+    display: block;
+    margin-top: 6px;
+    color: #607080;
+}
+
+/* Barra fixa e menu lateral. */
+.barra-superior {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 70px;
+    padding: 0 24px;
+    background: #17394d;
+    color: white;
+}
+
+.barra-superior > div {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.menu {
+    position: fixed;
+    top: 70px;
+    left: 0;
+    bottom: 0;
+    z-index: 9;
+    width: 220px;
+    padding: 20px 12px;
+    overflow-y: auto;
+    background: #214c63;
+}
+
+.menu a {
+    display: block;
+    padding: 13px 12px;
+    margin-bottom: 6px;
+    border-radius: 5px;
+    color: white;
+    text-decoration: none;
+}
+
+.menu a:hover,
+.menu a.ativo {
+    background: #168a72;
+}
+
+.conteudo {
+    margin: 70px 0 0 220px;
+    padding: 28px;
+}
+
+.menu-alterado .menu {
+    display: none;
+}
+
+.menu-alterado .conteudo {
+    margin-left: 0;
+}
+
+/* Formulários e tabelas. */
+.painel {
+    min-width: 0;
+    padding: 24px;
+    margin-bottom: 24px;
+    border: 1px solid #dce4e9;
+    border-radius: 8px;
+    background: white;
+}
+
+.campos {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px;
+    margin-bottom: 26px;
+}
+
+.botao {
+    display: inline-block;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 5px;
+    background: #168a72;
+    color: white;
+    text-decoration: none;
+    text-align: center;
+    cursor: pointer;
+}
+
+.botao:hover {
+    filter: brightness(0.93);
+}
+
+.botao.secundario {
+    background: #e5ebef;
+    color: #243746;
+}
+
+.botao.perigo {
+    background: #b84b4b;
+}
+
+.botao.pequeno {
+    padding: 6px 10px;
+    font-size: 12px;
+}
+
+.acoes {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.incluir {
+    margin-top: 22px;
+}
+
+#pesquisar {
+    max-width: 450px;
+    margin-bottom: 20px;
+}
+
+.tabela-scroll {
+    max-height: 400px;
+    overflow: auto;
+}
+
+.painel-producao .tabela-scroll {
+    max-height: 340px;
+}
+
+.painel-producao .linha-registro td {
+    padding: 4.5px 10px;
+}
+
+table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    text-align: left;
+    font-size: 13px;
+}
+
+th,
+td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e3e9ed;
+    overflow-wrap: anywhere;
+}
+
+th {
+    position: sticky;
+    top: 0;
+    background: #eaf0f4;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.aviso {
+    padding: 14px;
+    margin: 0 0 20px;
+    border-radius: 5px;
+    line-height: 1.6;
+}
+
+.aviso.erro {
+    background: #ffe9e7;
+    color: #922e25;
+}
+
+.aviso.sucesso {
+    background: #def5e8;
+    color: #236646;
+}
+
+.aviso ul {
+    margin: 0;
+    padding-left: 20px;
+}
+
+/* Dashboard e login. */
+.pesquisa-producao,
+.rodape-producao {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.pesquisa-producao #pesquisar {
+    margin-bottom: 0;
+}
+
+.rodape-producao {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    padding: 12px 0;
+    background: white;
+    align-items: center;
+    margin-top: 22px;
+    margin-bottom: 0;
+}
+
+.rodape-producao .botao:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.total-producao {
+    margin-left: auto;
+    padding: 16px 20px;
+    border: 1px solid #b8dfd3;
+    border-radius: 8px;
+    background: #edf8f3;
+    color: #236646;
+}
+
+.total-producao p {
+    margin: 0;
+    font-size: 12px;
+}
+
+.total-producao strong {
+    display: block;
+    margin: 6px 0;
+    font-size: 22px;
+}
+
+.filtro-periodo {
+    display: flex;
+    align-items: flex-end;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+
+.grade-usinas {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+}
+
+.grafico {
+    position: relative;
+    height: 230px;
+}
+
+.grafico-todas-usinas {
+    height: 360px;
+}
+
+details {
+    margin-top: 24px;
+}
+
+summary {
+    margin-bottom: 15px;
+    cursor: pointer;
+}
+
+.pagina-login {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    padding: 24px;
+}
+
+.cartao-login {
+    width: 100%;
+    max-width: 400px;
+    padding: 32px;
+    border: 1px solid #dce4e9;
+    border-radius: 8px;
+    background: white;
+}
+
+.cartao-login h1 {
+    color: #168a72;
+}
+
+.cartao-login input {
+    margin-bottom: 20px;
+}
+
+.cartao-login .botao {
+    width: 100%;
+}
+
+/* Em telas pequenas, o botão Menu abre a navegação sobre o conteúdo. */
+@media (max-width: 1100px) {
+    .grade-usinas {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .menu {
+        display: none;
+    }
+
+    .menu-alterado .menu {
+        display: block;
+    }
+
+    .conteudo {
+        margin-left: 0;
+        padding: 18px;
+    }
+
+    .campos {
+        grid-template-columns: 1fr;
+    }
+
+    .barra-superior {
+        padding: 0 12px;
+    }
+
+    .barra-superior span {
+        display: none;
+    }
+
+    .painel {
+        padding: 18px;
+    }
+}

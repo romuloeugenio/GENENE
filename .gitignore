@@ -1,0 +1,9 @@
+/tests/*.log
+/tests/.runtime/
+/*.zip
+/backups/
+.env
+.env.*
+!.env.example
+*.pem
+*.key
