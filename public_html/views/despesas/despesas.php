@@ -43,6 +43,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $usina_id = lerCampo($_POST, 'usina_id');
     $data = lerCampo($_POST, 'data');
     $valor_despesa = lerCampo($_POST, 'valor_despesa');
+    $valor_despesa_normalizado = preg_match('/^\d{1,10},\d{1,2}$/D', $valor_despesa) === 1
+        ? str_replace(',', '.', $valor_despesa)
+        : $valor_despesa;
     $descricao = lerCampo($_POST, 'descricao');
     $categoria = lerCampo($_POST, 'categoria');
     $tecnico = lerCampo($_POST, 'tecnico');
@@ -55,7 +58,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $erros[] = 'Data: informe uma data válida.';
     }
 
-    if (!numeroValido($valor_despesa)) {
+    if (!numeroValido($valor_despesa_normalizado)) {
         $erros[] = 'Valor (R$): informe um número positivo ou zero, com até duas casas decimais.';
     }
 
@@ -80,13 +83,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                      SET usina_id = ?, data = ?, valor_despesa = ?, descricao = ?, categoria = ?, tecnico = ?
                      WHERE id = ?'
                 );
-                $consulta->execute([$usina_id, $data, $valor_despesa, $descricao, $categoria, $tecnico === '' ? null : $tecnico, $id]);
+                $consulta->execute([$usina_id, $data, $valor_despesa_normalizado, $descricao, $categoria, $tecnico === '' ? null : $tecnico, $id]);
             } else {
                 $consulta = $pdo->prepare(
                     'INSERT INTO despesas (usina_id, data, valor_despesa, descricao, categoria, tecnico)
                      VALUES (?, ?, ?, ?, ?, ?)'
                 );
-                $consulta->execute([$usina_id, $data, $valor_despesa, $descricao, $categoria, $tecnico === '' ? null : $tecnico]);
+                $consulta->execute([$usina_id, $data, $valor_despesa_normalizado, $descricao, $categoria, $tecnico === '' ? null : $tecnico]);
             }
 
             redirecionar('views/despesas/index_despesas.php?msg=sucesso');
@@ -153,8 +156,9 @@ require __DIR__ . '/../header.php';
 
                         <div class="campo">
                             <label for="valor_despesa">Valor (R$)</label>
-                            <input type="number" id="valor_despesa" name="valor_despesa"
-                                   value="<?= escapar($valor_despesa) ?>" min="0" max="9999999999.99" step="0.01" required>
+                            <input type="text" id="valor_despesa" name="valor_despesa" inputmode="decimal"
+                                   value="<?= escapar($valor_despesa) ?>" maxlength="13"
+                                   pattern="[0-9]{1,10}([,.][0-9]{1,2})?" required>
                         </div>
 
                         <div class="campo">
