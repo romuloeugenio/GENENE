@@ -204,6 +204,39 @@ function configuracaoDark(chave, agrupado) {
         }
     };
 
+    if (chave === 'despesas') {
+        configuracao.data.datasets = [
+            configuracao.data.datasets[0],
+            {
+                type: 'line',
+                label: 'Produção de energia (mWh)',
+                data: agrupado.energia,
+                yAxisID: 'energia',
+                borderColor: '#a78bfa',
+                backgroundColor: 'rgba(167, 139, 250, 0.22)',
+                borderWidth: 2,
+                fill: 'origin',
+                tension: 0.3,
+                pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
+                pointHoverRadius: 5,
+                order: 1
+            }
+        ];
+        configuracao.options.plugins.legend = {
+            display: true,
+            position: 'bottom',
+            labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+        };
+        const eixoBase = configuracao.options.scales.y;
+        configuracao.options.scales.y.title.text = 'Despesas totais (R$)';
+        configuracao.options.scales.energia = {
+            ...eixoBase,
+            position: 'right',
+            grid: { drawOnChartArea: false },
+            title: { display: true, text: 'Produção de energia (mWh)', color: '#a78bfa' }
+        };
+    }
+
     if (chave === 'comparativo') {
         configuracao.data.datasets = [
             {

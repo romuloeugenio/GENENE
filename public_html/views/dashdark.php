@@ -404,9 +404,9 @@ if (podeEditar() && podeExcluir()) {
                     </section>
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <h2 class="font-semibold text-white">Despesas totais</h2>
-                        <p class="mt-2 text-xs text-slate-400">Todas as categorias, na mesma usina e no mesmo período dos demais gráficos.</p>
+                        <p class="mt-2 text-xs text-slate-400">Todas as categorias em reais e produção de energia em área, na mesma usina e no mesmo período dos demais gráficos.</p>
                         <div class="relative mt-5 h-80">
-                            <canvas id="grafico-despesas" role="img" aria-label="Despesas totais em reais"></canvas>
+                            <canvas id="grafico-despesas" role="img" aria-label="Despesas totais em reais e produção de energia em área de mWh"></canvas>
                         </div>
                     </section>
 
