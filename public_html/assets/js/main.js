@@ -76,7 +76,7 @@ function normalizarTexto(texto) {
 /**
  * Filtra a tabela por texto e, na produção, pelo período inclusivo informado.
  * Parâmetros: nenhum. Lê a pesquisa, as datas opcionais e as linhas do documento.
- * @returns {void} Atualiza as linhas visíveis, o aviso de período e o total em kWh.
+ * @returns {void} Atualiza as linhas visíveis, o aviso de período e o total em mWh.
  */
 function pesquisarTabela() {
     const pesquisa = normalizarTexto(document.getElementById('pesquisar').value.trim());
@@ -156,7 +156,7 @@ function carregarGraficos() {
 
 /**
  * Mostra a produção de energia sem misturar unidades financeiras.
- * @param {Object} usina Dados com id, rotulos e energia em kWh.
+ * @param {Object} usina Dados com id, rotulos e energia em mWh.
  * @returns {void} Desenha o gráfico de produção da usina.
  */
 function criarGraficoEnergia(usina) {
@@ -164,20 +164,40 @@ function criarGraficoEnergia(usina) {
         type: 'bar',
         data: {
             labels: usina.rotulos,
-            datasets: [{
-                label: 'Energia (kWh)',
-                data: usina.energia,
-                backgroundColor: '#168a72'
-            }]
+            datasets: [
+                {
+                    type: 'bar',
+                    label: 'Energia realizada (mWh)',
+                    data: usina.energia,
+                    backgroundColor: '#168a72',
+                    order: 2
+                },
+                {
+                    type: 'line',
+                    label: 'Produção estimada (mWh)',
+                    data: usina.estimada,
+                    borderColor: '#f97316',
+                    backgroundColor: '#f97316',
+                    borderWidth: 2,
+                    pointRadius: usina.estimada.some(valor => valor !== null) ? 4 : 0,
+                    pointHoverRadius: 5,
+                    tension: 0.25,
+                    fill: false,
+                    spanGaps: false,
+                    order: 1
+                }
+            ]
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             locale: 'pt-BR',
+            interaction: { mode: 'index', intersect: false },
+            plugins: { legend: { position: 'bottom' } },
             scales: {
                 y: {
                     beginAtZero: true,
-                    title: { display: true, text: 'kWh' }
+                    title: { display: true, text: 'mWh' }
                 }
             }
         }
@@ -185,8 +205,8 @@ function criarGraficoEnergia(usina) {
 }
 
 /**
- * Compara diárias em barras e horas extras em linha, em eixos independentes.
- * @param {Object} usina Dados com id, rotulos, diarias e horas, ambos em reais.
+ * Compara diárias em barras e despesas operacionais em linhas, em eixos independentes.
+ * @param {Object} usina Dados com id, rotulos e séries de despesas em reais.
  * @returns {void} Desenha cada série em seu próprio eixo vertical em R$.
  */
 function criarGraficoComparativo(usina) {
@@ -214,6 +234,42 @@ function criarGraficoComparativo(usina) {
                     tension: 0.25,
                     fill: false,
                     order: 1
+                },
+                {
+                    type: 'line',
+                    label: 'MATERIAIS (R$)',
+                    data: usina.materiais,
+                    yAxisID: 'horas',
+                    borderColor: '#8b5cf6',
+                    backgroundColor: '#8b5cf6',
+                    borderWidth: 2,
+                    tension: 0.25,
+                    fill: false,
+                    order: 1
+                },
+                {
+                    type: 'line',
+                    label: 'SERVIÇOS (R$)',
+                    data: usina.servicos,
+                    yAxisID: 'horas',
+                    borderColor: '#0ea5e9',
+                    backgroundColor: '#0ea5e9',
+                    borderWidth: 2,
+                    tension: 0.25,
+                    fill: false,
+                    order: 1
+                },
+                {
+                    type: 'line',
+                    label: 'MAT/SERVIÇO (R$)',
+                    data: usina.mat_servico,
+                    yAxisID: 'horas',
+                    borderColor: '#ec4899',
+                    backgroundColor: '#ec4899',
+                    borderWidth: 2,
+                    tension: 0.25,
+                    fill: false,
+                    order: 1
                 }
             ]
         },
@@ -233,7 +289,7 @@ function criarGraficoComparativo(usina) {
                     position: 'right',
                     beginAtZero: true,
                     grid: { drawOnChartArea: false },
-                    title: { display: true, text: 'Horas extras (R$)' }
+                    title: { display: true, text: 'Despesas operacionais (R$)' }
                 }
             }
         }
@@ -263,7 +319,7 @@ function criarGraficoDespesasTotais(usina) {
 
 /**
  * Compara a produção de todas as usinas com linhas coloridas e legenda no topo.
- * @param {Object} dados Rótulos do período e lista de usinas com nome e energia em kWh.
+ * @param {Object} dados Rótulos do período e lista de usinas com nome e energia em mWh.
  * @returns {void} Desenha o gráfico de linhas acima dos painéis individuais.
  */
 function criarGraficoTodasUsinas(dados) {
@@ -299,7 +355,7 @@ function criarGraficoTodasUsinas(dados) {
             },
             scales: {
                 x: { grid: { display: false }, ticks: { maxTicksLimit: 12, maxRotation: 0 } },
-                y: { beginAtZero: true, title: { display: true, text: 'kWh' } }
+                y: { beginAtZero: true, title: { display: true, text: 'mWh' } }
             }
         }
     });

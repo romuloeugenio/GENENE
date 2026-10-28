@@ -7,12 +7,23 @@ exigirLogin();
 $pdo = conectarBanco();
 $aviso = '';
 $inicio = lerCampo($_GET, 'inicio', '2026-01-01');
-$fim = lerCampo($_GET, 'fim', date('Y-m-d'));
+$fim = lerCampo($_GET, 'fim', '2026-12-31');
+$normalizarData = static function ($data) {
+    if (preg_match('/^(\d{2})\/(\d{2})\/(\d{4})$/D', $data, $partes)) {
+        if (checkdate((int) $partes[2], (int) $partes[1], (int) $partes[3])) {
+            return $partes[3] . '-' . $partes[2] . '-' . $partes[1];
+        }
+    }
+
+    return $data;
+};
+$inicio = $normalizarData($inicio);
+$fim = $normalizarData($fim);
 
 if (!dataValida($inicio) || !dataValida($fim) || $inicio > $fim) {
-    $aviso = 'Período inválido. Exibindo o período padrão a partir de 01/01/2026.';
+    $aviso = 'Período inválido. Exibindo o período padrão de 01/01/2026 a 31/12/2026.';
     $inicio = '2026-01-01';
-    $fim = date('Y-m-d');
+    $fim = '2026-12-31';
 }
 
 // Carrega no máximo 365 dias até a data final. Os botões de período navegam nesse intervalo.
@@ -26,7 +37,13 @@ if ($inicio < $limiteInicial) {
 
 $consulta = $pdo->query('SELECT id, nome, tipo, capacidade_kw, status FROM usinas ORDER BY id');
 $usinas = $consulta->fetchAll();
-$idRecebido = lerCampo($_GET, 'usina_id', (string) ($usinas[0]['id'] ?? '0'));
+$idPadrao = '2';
+if (!array_filter($usinas, static function ($usina) {
+    return (string) $usina['id'] === '2';
+})) {
+    $idPadrao = (string) ($usinas[0]['id'] ?? '0');
+}
+$idRecebido = lerCampo($_GET, 'usina_id', $idPadrao);
 $usinaSelecionada = null;
 
 foreach ($usinas as $usina) {
@@ -46,9 +63,12 @@ $horas = [];
 $diarias = [];
 $despesas = [];
 $registrosProducao = [];
+$producaoEstimada = [];
 
 if ($usinaSelecionada) {
     $parametros = [$usinaSelecionada['id'], $limiteInicial, $fim];
+    $inicioEstimativa = substr($limiteInicial, 0, 7) . '-01';
+    $fimEstimativa = (new DateTimeImmutable($fim))->modify('last day of this month')->format('Y-m-d');
 
     // Cada consulta soma apenas uma tabela para evitar duplicação de valores.
     $consulta = $pdo->prepare(
@@ -59,6 +79,17 @@ if ($usinaSelecionada) {
     );
     $consulta->execute($parametros);
     $energia = $consulta->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    $consulta = $pdo->prepare(
+        'SELECT mes_estimado, producao
+         FROM producao_estimada_usina
+         WHERE id_usina = ? AND mes_estimado BETWEEN ? AND ?
+         ORDER BY mes_estimado'
+    );
+    $consulta->execute([$usinaSelecionada['id'], $inicioEstimativa, $fimEstimativa]);
+    foreach ($consulta->fetchAll(PDO::FETCH_KEY_PAIR) as $mes => $producao) {
+        $producaoEstimada[substr($mes, 0, 7)] = (float) $producao;
+    }
 
     $consulta = $pdo->prepare(
         'SELECT d.data, SUM(d.valor_despesa) AS total
@@ -150,6 +181,7 @@ $dados = [
     'usinaId' => $usinaSelecionada ? (int) $usinaSelecionada['id'] : null,
     'serie' => $serie,
     'producao' => $registrosProducao,
+    'producaoEstimada' => $producaoEstimada,
     'todasUsinas' => array_values($producaoTodas)
 ];
 
@@ -160,6 +192,7 @@ $links = [
     ['Usinas', 'views/usinas/index_usinas.php', '☀'],
     ['Técnicos', 'views/tecnicos/index_tecnicos.php', '♙'],
     ['Produção de Energia', 'views/producao/index_producao.php', 'ϟ'],
+    ['Produção Estimada', 'views/producao_estimada/index_producao_estimada.php', '◷'],
     ['Despesas', 'views/despesas/index_despesas.php', '▤'],
     ['Categorias', 'views/categoria/index_categoria.php', '▣']
 ];
@@ -178,7 +211,7 @@ if (podeEditar() && podeExcluir()) {
         <title>DashDark - GERENE</title>
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
-        <script defer src="<?= escapar(endereco('assets/js/dashdark.js')) ?>"></script>
+        <script defer src="<?= escapar(endereco('assets/js/dashdark.js')) ?>?v=<?= (int) filemtime(__DIR__ . '/../assets/js/dashdark.js') ?>"></script>
     </head>
     <body class="min-h-screen bg-[#10121b] font-sans text-sm text-slate-200 antialiased [color-scheme:dark]">
         <!-- Layout independente: o dashboard clássico mantém os estilos anteriores. -->
@@ -239,11 +272,11 @@ if (podeEditar() && podeExcluir()) {
                 <form id="filtro-dark" method="get" class="mb-6 flex flex-wrap items-end gap-4 rounded-xl border border-white/5 bg-[#191c29] p-5">
                     <div>
                         <label for="inicio" class="mb-2 block text-xs text-slate-400">Data inicial</label>
-                        <input id="inicio" name="inicio" type="date" value="<?= escapar($inicio) ?>" min="1000-01-01" max="9999-12-31" required class="rounded-lg border border-white/10 bg-[#121520] px-3 py-2.5 text-xs outline-none focus:border-violet-400">
+                        <input id="inicio" name="inicio" type="text" inputmode="numeric" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" placeholder="dd/mm/aaaa" value="<?= escapar(formatarData($inicio)) ?>" required class="rounded-lg border border-white/10 bg-[#121520] px-3 py-2.5 text-xs outline-none focus:border-violet-400">
                     </div>
                     <div>
                         <label for="fim" class="mb-2 block text-xs text-slate-400">Data final</label>
-                        <input id="fim" name="fim" type="date" value="<?= escapar($fim) ?>" min="1000-01-01" max="9999-12-31" required class="rounded-lg border border-white/10 bg-[#121520] px-3 py-2.5 text-xs outline-none focus:border-violet-400">
+                        <input id="fim" name="fim" type="text" inputmode="numeric" pattern="[0-9]{2}/[0-9]{2}/[0-9]{4}" placeholder="dd/mm/aaaa" value="<?= escapar(formatarData($fim)) ?>" required class="rounded-lg border border-white/10 bg-[#121520] px-3 py-2.5 text-xs outline-none focus:border-violet-400">
                     </div>
                     <div class="min-w-48 flex-1">
                         <label for="usina_id" class="mb-2 block text-xs text-slate-400">Usina</label>
@@ -276,7 +309,7 @@ if (podeEditar() && podeExcluir()) {
                     <div class="mb-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                         <section class="rounded-xl border border-white/5 bg-[#191c29] p-5">
                             <p class="text-xs text-slate-400">Produção de energia <span class="float-right text-violet-400">ϟ</span></p>
-                            <p class="mt-4 text-2xl font-semibold text-white"><span id="total-energia"><?= formatarNumero($totais['energia']) ?></span> <span class="text-xs font-normal text-slate-500">kWh</span></p>
+                            <p class="mt-4 text-2xl font-semibold text-white"><span id="total-energia"><?= formatarNumero($totais['energia']) ?></span> <span class="text-xs font-normal text-slate-500">mWh</span></p>
                             <p class="mt-2 text-[11px] text-slate-500">Energia gerada no período</p>
                         </section>
                         <section class="rounded-xl border border-white/5 bg-[#191c29] p-5">
@@ -302,7 +335,7 @@ if (podeEditar() && podeExcluir()) {
                         <div class="flex flex-wrap items-start justify-between gap-4">
                             <div>
                                 <h2 class="font-semibold text-white">Produção da usina</h2>
-                                <p class="mt-1 text-xs text-slate-500">Energia gerada · kWh</p>
+                                <p class="mt-1 text-xs text-slate-500">Energia gerada e produção estimada · mWh</p>
                             </div>
                             <div class="flex flex-wrap gap-1 rounded-lg bg-[#121520] p-1" aria-label="Selecionar duração do período">
                                 <?php foreach ([7 => '7D', 30 => '30D', 90 => '3M', 180 => '6M', 365 => '1A'] as $duracao => $rotulo): ?>
@@ -312,7 +345,7 @@ if (podeEditar() && podeExcluir()) {
                         </div>
 
                         <div id="area-producao" tabindex="0" aria-label="Gráfico de produção. Use os botões de período ou as teclas mais e menos." class="relative mt-6 h-80 rounded-lg focus-visible:outline-2 focus-visible:outline-violet-400 sm:h-96">
-                            <canvas id="grafico-energia" role="img" aria-label="Produção de energia da usina em kWh"></canvas>
+                            <canvas id="grafico-energia" role="img" aria-label="Produção de energia realizada e estimada da usina em mWh"></canvas>
                         </div>
                         <div class="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-white/5 pt-4 text-[11px] text-slate-500">
                             <p>Selecione 7D, 30D, 3M, 6M ou 1A para ajustar o período dos gráficos.</p>
@@ -322,9 +355,9 @@ if (podeEditar() && podeExcluir()) {
 
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <h2 class="font-semibold text-white">Produção de todas as usinas</h2>
-                        <p class="mt-2 text-xs text-slate-400">Uma linha por usina · kWh · Mesmo período selecionado acima. Clique na legenda para ocultar ou exibir uma usina.</p>
+                        <p class="mt-2 text-xs text-slate-400">Uma linha por usina · mWh · Mesmo período selecionado acima. Clique na legenda para ocultar ou exibir uma usina.</p>
                         <div class="relative mt-5 h-80 sm:h-96">
-                            <canvas id="grafico-usinas" role="img" aria-label="Comparação da produção de energia de todas as usinas em linhas, em kWh"></canvas>
+                            <canvas id="grafico-usinas" role="img" aria-label="Comparação da produção de energia de todas as usinas em linhas, em mWh"></canvas>
                         </div>
                     </section>
 
@@ -349,7 +382,7 @@ if (podeEditar() && podeExcluir()) {
                         <div class="mt-5 max-h-[400px] overflow-auto">
                             <table class="w-full text-left text-xs">
                                 <thead class="sticky top-0 bg-[#222636] text-slate-400">
-                                    <tr><th class="px-4 py-3">Registro</th><th class="px-4 py-3">Data</th><th class="px-4 py-3 text-right">Energia gerada (kWh)</th></tr>
+                                    <tr><th class="px-4 py-3">Registro</th><th class="px-4 py-3">Data</th><th class="px-4 py-3 text-right">Energia gerada (mWh)</th></tr>
                                 </thead>
                                 <tbody id="tabela-producao">
                                     <?php $quantidade = 0; ?>

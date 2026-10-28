@@ -100,14 +100,19 @@ function executarTestesDashDark() {
         serie.push({ data: data, energia: 10, horas: 2, despesas: 3, diarias: 1 });
     }
 
-    const mensal = agruparDark(serie, '2025-01-01', '2025-12-31');
+    const estimativas = { '2025-01': 120, '2025-06': 150, '2025-12': 180 };
+    const mensal = agruparDark(serie, '2025-01-01', '2025-12-31', estimativas);
     conferirDark(mensal.mensal && mensal.rotulos.length === 12, 'Ano completo agrupado em doze meses');
     conferirDark(mensal.energia[1] === 280 && mensal.horas[1] === 56, 'Fevereiro agregado corretamente');
     conferirDark(mensal.totais.energia === 3650 && mensal.totais.despesas === 1095, 'Totais anuais');
-    const parcial = agruparDark(serie, '2025-01-15', '2025-04-10');
+    conferirDark(mensal.estimada[0] === 120 && mensal.estimada[5] === 150 && mensal.estimada[11] === 180, 'Estimativas mensais alinhadas ao agrupamento');
+    const parcial = agruparDark(serie, '2025-01-15', '2025-04-10', estimativas);
     conferirDark(parcial.energia[0] === 170 && parcial.energia[3] === 100, 'Meses parciais respeitam as datas');
+    conferirDark(parcial.estimada[0] === 120, 'Estimativa aparece em mês parcialmente selecionado');
     const diario = agruparDark(serie, '2025-12-25', '2025-12-31');
     conferirDark(!diario.mensal && diario.rotulos.length === 7, 'Intervalo curto agrupado por dia');
+    const estimativaDiaria = agruparDark(serie, '2025-12-25', '2025-12-31', estimativas);
+    conferirDark(estimativaDiaria.estimada.filter(valor => valor !== null).length === 1 && estimativaDiaria.estimada[0] === 180, 'Estimativa mensal aparece uma vez em intervalo diário parcial');
 
     document.getElementById('dados-dark').textContent = JSON.stringify({
         inicio: '2025-12-02',
@@ -115,6 +120,7 @@ function executarTestesDashDark() {
         limiteInicial: '2025-01-01',
         usinaId: 1,
         serie: serie,
+        producaoEstimada: { '2025-01': 120, '2025-12': 180 },
         todasUsinas: [
             { nome: 'Usina A', valores: { '2025-01-01': 100, '2025-12-31': 20 } },
             { nome: 'Usina B', valores: { '2025-12-31': 70 } },
@@ -127,6 +133,27 @@ function executarTestesDashDark() {
     });
     iniciarDark();
     conferirDark(graficosTeste.length === 4, 'Quatro gráficos inicializados');
+    conferirDark(
+        document.getElementById('inicio').value === '02/12/2025'
+        && document.getElementById('fim').value === '31/12/2025',
+        'Campos de período usam formato DD/MM/AAAA'
+    );
+    const producao = graficosTeste[0].data.datasets;
+    conferirDark(producao.length === 2, 'Gráfico de produção tem séries realizada e estimada');
+    conferirDark(
+        producao[0].label === 'Produção (mWh)'
+        && graficosTeste[0].options.scales.y.title.text === 'mWh',
+        'Produção e eixo do gráfico usam unidade mWh'
+    );
+    conferirDark(
+        producao[1].type === 'line'
+        && producao[1].label === 'Produção estimada (mWh)'
+        && producao[1].borderColor === '#f97316'
+        && !producao[1].borderDash,
+        'Estimativa exibida como linha laranja contínua'
+    );
+    conferirDark(producao[1].data.filter(valor => valor !== null).length === 1 && producao[1].data.includes(180), 'Série estimada respeita o período visível');
+    conferirDark(producao[1].pointRadius > 0, 'Estimativa mensal isolada permanece visível em período diário');
     const area = document.getElementById('area-producao');
     conferirDark(typeof area.listeners.wheel === 'undefined', 'Gráfico não intercepta a roda do mouse');
 

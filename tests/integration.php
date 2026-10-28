@@ -185,14 +185,18 @@ try {
     conferir(requisitar('index.php', ['email' => 'admin@usina.com', 'senha' => 'admin'])['status'] === 403, 'Login exige token');
 
     $token = entrar('admin@usina.com', 'admin');
-    conferir(strpos(requisitar('views/dashboard.php')['corpo'], 'Nenhuma usina') !== false, 'Dashboard vazio');
-    conferir(strpos(requisitar('views/dashdark.php')['corpo'], 'Sua operação começa aqui') !== false, 'DashDark sem usinas');
+    $dashboardInicial = requisitar('views/dashboard.php')['corpo'];
+    conferir(strpos($dashboardInicial, 'Nenhuma usina') !== false, 'Dashboard vazio');
+    conferir(strpos($dashboardInicial, 'views/producao_estimada/index_producao_estimada.php') !== false, 'Menu de Produção Estimada no dashboard');
+    $dashdarkInicial = requisitar('views/dashdark.php')['corpo'];
+    conferir(strpos($dashdarkInicial, 'Sua operação começa aqui') !== false, 'DashDark sem usinas');
+    conferir(strpos($dashdarkInicial, 'views/producao_estimada/index_producao_estimada.php') !== false, 'Menu de Produção Estimada no DashDark');
     conferir(requisitar('logout.php')['status'] === 405, 'Logout exige POST');
 
     $cadastros = [
         'usuarios' => [
             'nome' => 'Consulta', 'email' => 'consulta@example.com', 'senha' => 'SenhaTeste123',
-            'pode_editar' => 'N', 'pode_excluir' => 'N'
+            'administrador' => 'S', 'pode_editar' => 'N', 'pode_excluir' => 'N'
         ],
         'usinas' => [
             'nome' => 'Usina <script>alert(1)</script>', 'tipo' => 'Fotovoltaica',
@@ -209,7 +213,7 @@ try {
             'descricao_categoria' => 'Elétrica', 'Centro_de_custo' => '123'
         ],
         'despesas' => [
-            'usina_id' => '1', 'data' => '2026-01-02', 'valor_despesa' => '45.20',
+            'usina_id' => '1', 'data' => '2026-01-02', 'valor_despesa' => '45,20',
             'descricao' => 'Cabos', 'categoria' => '1', 'tecnico' => '1'
         ],
         'horas_extras' => [
@@ -228,12 +232,104 @@ try {
         $id = $modulo === 'usuarios' ? 2 : 1;
 
         conferir(requisitar($formulario)['status'] === 200, 'Abrir inclusão de ' . $modulo);
+        if ($modulo === 'despesas') {
+            $html = requisitar($formulario)['corpo'];
+            conferir(strpos($html, 'inputmode="decimal"') !== false, 'Campo de valor permite entrada decimal');
+        }
         conferir(requisitar($formulario, ['token' => $token] + $campos)['status'] === 303, 'Incluir ' . $modulo);
+        if ($modulo === 'despesas') {
+            conferir($pdo->query('SELECT valor_despesa FROM despesas WHERE id = 1')->fetchColumn() === '45.20', 'Valor decimal com vírgula é gravado corretamente');
+        }
         conferir(requisitar($listagem)['status'] === 200, 'Listar ' . $modulo);
         conferir(requisitar($formulario . '?id=' . $id)['status'] === 200, 'Abrir edição de ' . $modulo);
 
         $resposta = requisitar($formulario . '?id=' . $id, ['token' => $token] + $campos);
         conferir($resposta['status'] === 303, 'Editar ' . $modulo);
+
+        if ($modulo === 'despesas') {
+            conferir($pdo->query('SELECT valor_despesa FROM despesas WHERE id = 1')->fetchColumn() === '45.20', 'Edição preserva o valor decimal com vírgula');
+        }
+
+        if ($modulo === 'usuarios') {
+            conferir($pdo->query('SELECT administrador FROM usuarios WHERE id = 2')->fetchColumn() === 'S', 'Cadastro e edição persistem administrador');
+            $dadosUsuario = ['token' => $token, 'administrador' => 'N'] + $cadastros['usuarios'];
+            conferir(requisitar('views/usuarios/usuarios.php?id=2', $dadosUsuario)['status'] === 303, 'Atualizar campo administrador');
+            conferir($pdo->query('SELECT administrador FROM usuarios WHERE id = 2')->fetchColumn() === 'N', 'Edição atualiza o valor de administrador');
+            $dadosUsuario = ['token' => $token, 'administrador' => 'X'] + $cadastros['usuarios'];
+            conferir(requisitar('views/usuarios/usuarios.php', $dadosUsuario)['status'] === 422, 'Rejeitar valor de administrador inválido');
+        }
+
+        if ($modulo === 'despesas') {
+            $camposEstimativa = [
+                'token' => $token,
+                'id_usina' => '1',
+                'mes_estimado' => '2026-03',
+                'producao' => '123,45'
+            ];
+            $formEstimativa = requisitar('views/producao_estimada/producao_estimada.php');
+            conferir($formEstimativa['status'] === 200, 'Abrir inclusão de produção estimada');
+            conferir(strpos($formEstimativa['corpo'], 'inputmode="decimal"') !== false, 'Campo de produção estimada aceita entrada decimal');
+            conferir(
+                requisitar('views/producao_estimada/producao_estimada.php', $camposEstimativa)['status'] === 303,
+                'Incluir produção estimada'
+            );
+            conferir(
+                $pdo->query("SELECT producao FROM producao_estimada_usina WHERE id_usina = 1 AND mes_estimado = '2026-03-01'")->fetchColumn() === '123.45',
+                'Produção estimada persiste valor decimal'
+            );
+            conferir(
+                requisitar('views/producao_estimada/producao_estimada.php', $camposEstimativa)['status'] === 422,
+                'Rejeitar estimativa duplicada para usina e mês'
+            );
+            $pdo->exec("INSERT INTO producao_estimada_usina (id_usina, mes_estimado, producao) VALUES (1, '2026-02-28', 701.25)");
+            conferir(
+                $pdo->query("SELECT producao FROM producao_estimada_usina WHERE id_usina = 1 AND mes_estimado = '2026-02-28'")->fetchColumn() === '701.25',
+                'Estimativa de fim de mês persiste no banco'
+            );
+            $estimativaNoGrafico = dadosDashDark(requisitar('views/dashdark.php?usina_id=1&inicio=2026-02-01&fim=2026-02-03'));
+            conferir(
+                $estimativaNoGrafico['producaoEstimada'] === ['2026-02' => 701.25],
+                'DashDark carrega estimativa registrada no fim do mês'
+            );
+            conferir(
+                requisitar('views/producao_estimada/producao_estimada.php?id_usina=1&mes_estimado=2026-02-28')['status'] === 200,
+                'Abrir edição de estimativa registrada no fim do mês'
+            );
+            $estimativaNoDashboard = dadosGraficos(requisitar('views/dashboard.php?inicio=2026-02-01&fim=2026-02-03'));
+            conferir(
+                $estimativaNoDashboard[0]['estimada'] === [701.25, null, null],
+                'Dashboard exibe estimativa de fim de mês dentro do mês selecionado'
+            );
+            $pdo->exec("DELETE FROM producao_estimada_usina WHERE id_usina = 1 AND mes_estimado = '2026-02-28'");
+            $edicaoEstimativa = $camposEstimativa;
+            $edicaoEstimativa['mes_estimado'] = '2026-04';
+            $edicaoEstimativa['producao'] = '234,56';
+            conferir(
+                requisitar(
+                    'views/producao_estimada/producao_estimada.php?id_usina=1&mes_estimado=2026-03-01',
+                    $edicaoEstimativa
+                )['status'] === 303,
+                'Editar produção estimada'
+            );
+            conferir(
+                $pdo->query("SELECT producao FROM producao_estimada_usina WHERE id_usina = 1 AND mes_estimado = '2026-04-01'")->fetchColumn() === '234.56',
+                'Edição atualiza mês e produção estimada'
+            );
+            $listaEstimativa = requisitar('views/producao_estimada/index_producao_estimada.php')['corpo'];
+            conferir(strpos($listaEstimativa, 'Usina &lt;script&gt;alert(1)&lt;/script&gt;') !== false, 'Listagem da produção estimada escapa nome da usina');
+            conferir(
+                requisitar('views/producao_estimada/index_producao_estimada.php', [
+                    'token' => $token,
+                    'id_usina' => '1',
+                    'mes_estimado' => '2026-04-01'
+                ])['status'] === 303,
+                'Excluir produção estimada'
+            );
+            conferir(
+                (int) $pdo->query('SELECT COUNT(*) FROM producao_estimada_usina')->fetchColumn() === 0,
+                'Exclusão remove produção estimada'
+            );
+        }
     }
 
     $html = requisitar('views/usinas/index_usinas.php')['corpo'];
@@ -290,7 +386,7 @@ try {
 
     $resposta = requisitar('views/usinas/index_usinas.php', ['token' => $token, 'id' => '1']);
     conferir(strpos($resposta['cabecalho'], 'error=1') !== false, 'FK impede excluir usina com lançamentos');
-    $campos = ['token' => $token, 'nome' => 'Administrador', 'email' => 'admin@usina.com', 'senha' => '', 'pode_editar' => 'N', 'pode_excluir' => 'N'];
+    $campos = ['token' => $token, 'nome' => 'Administrador', 'email' => 'admin@usina.com', 'senha' => '', 'administrador' => 'N', 'pode_editar' => 'N', 'pode_excluir' => 'N'];
     conferir(requisitar('views/usuarios/usuarios.php?id=1', $campos)['status'] === 422, 'Preservação do último gestor');
     $resposta = requisitar('views/usuarios/index_usuarios.php', ['token' => $token, 'id' => '1']);
     conferir(strpos($resposta['cabecalho'], 'error=1') !== false, 'Autoexclusão bloqueada');
@@ -302,33 +398,76 @@ try {
 
     $pdo->exec("INSERT INTO categoria (descricao_categoria, Centro_de_custo) VALUES ('DIARIAS', 100)");
     $pdo->exec("INSERT INTO despesas (usina_id, data, valor_despesa, descricao, categoria, tecnico) VALUES (1, '2026-01-02', 200, 'Diária na nova categoria', 3, 1)");
-    for ($id = 2; $id <= 5; $id++) {
+    $pdo->exec("INSERT INTO categoria (id_categoria, descricao_categoria, Centro_de_custo) VALUES (4, 'MATERIAIS', 400), (5, 'SERVIÇOS', 500), (6, 'MAT/SERVIÇO', 600)");
+    $pdo->exec("INSERT INTO despesas (usina_id, data, valor_despesa, descricao, categoria, tecnico) VALUES
+        (1, '2026-01-02', 40, 'Materiais categoria 4', 4, 1),
+        (1, '2026-01-02', 50, 'Serviços categoria 5', 5, 1),
+        (1, '2026-01-02', 60, 'Mat/serviço categoria 6', 6, 1)");
+    for ($id = 2; $id <= 7; $id++) {
         $pdo->exec("INSERT INTO usinas (nome, tipo, capacidade_kw, localizacao) VALUES ('Usina $id', 'Hidrelétrica', 100, 'Local')");
     }
+    $pdo->exec("INSERT INTO producao_estimada_usina (id_usina, mes_estimado, producao) VALUES (1, '2026-01-01', 80.25), (2, '2026-01-01', 999.99), (5, '2026-01-30', 70.50), (6, '2026-02-28', 60.25), (7, '2026-03-30', 50.75)");
 
     $resposta = requisitar('views/dashboard.php?inicio=2026-01-01&fim=2026-01-03');
     $graficos = dadosGraficos($resposta);
-    conferir(count($graficos) === 4 && $graficos[3]['id'] === 4, 'Seleção das quatro primeiras usinas');
+    conferir(
+        strpos($resposta['corpo'], 'Energia (mWh)') !== false
+        && strpos($resposta['corpo'], 'em mWh') !== false
+        && strpos($resposta['corpo'], 'assets/js/main.js?v=') !== false,
+        'Dashboard apresenta unidade mWh e versão atualizada do JavaScript'
+    );
+    conferir(
+        count($graficos) === 7
+        && array_column($graficos, 'id') === [1, 2, 3, 4, 5, 6, 7],
+        'Dashboard inclui cards para todas as sete usinas'
+    );
     conferir($graficos[0]['energia'] === [0, 120.5, 0], 'Energia e dias sem lançamento');
+    conferir($graficos[0]['estimada'] === [80.25, null, null], 'Estimativa diária aparece uma vez no mês selecionado');
+    conferir($graficos[4]['estimada'] === [70.5, null, null], 'Estimativa no dia 30 aparece no mês parcialmente selecionado');
+    conferir(
+        strpos($resposta['corpo'], '<span>Total Gerado:</span>') !== false
+        && strpos($resposta['corpo'], '<span>Total Estimado:</span>') !== false
+        && strpos($resposta['corpo'], 'id="total-gerado-1">120,50 mWh</strong>') !== false
+        && strpos($resposta['corpo'], 'id="total-estimado-1">80,25 mWh</strong>') !== false
+        && strpos($resposta['corpo'], 'id="total-estimado-5">70,50 mWh</strong>') !== false,
+        'Cards exibem totais gerado e estimado do período com os rótulos esperados'
+    );
     conferir($graficos[0]['horas'] === [0, 80, 0], 'Horas extras usa valores da categoria em reais');
     conferir($graficos[0]['diarias'] === [0, 200, 0], 'Diárias vêm exclusivamente da categoria DIARIAS');
-    conferir($graficos[0]['despesas'] === [0, 325.2, 0], 'Despesas totais incluem horas extras uma única vez');
-    conferir(substr_count($resposta['corpo'], '<canvas') === 13, 'Comparação geral e três gráficos por usina');
+    conferir($graficos[0]['materiais'] === [0, 40, 0], 'Gráfico inclui série da categoria MATERIAIS');
+    conferir($graficos[0]['servicos'] === [0, 50, 0], 'Gráfico inclui série da categoria SERVIÇOS');
+    conferir($graficos[0]['mat_servico'] === [0, 60, 0], 'Gráfico inclui série da categoria MAT/SERVIÇO');
+    conferir($graficos[0]['despesas'] === [0, 475.2, 0], 'Despesas totais incluem todas as categorias uma única vez');
+    conferir(substr_count($resposta['corpo'], '<canvas') === 22, 'Comparação geral e três gráficos para cada usina');
     preg_match('/<script type="application\/json" id="dados-todas-usinas">(.*?)<\/script>/s', $resposta['corpo'], $comparacaoJson);
     $comparacao = json_decode($comparacaoJson[1], true);
-    conferir(count($comparacao['usinas']) === 5, 'Comparação clara inclui todas as cinco usinas');
+    conferir(count($comparacao['usinas']) === 7, 'Comparação clara inclui todas as sete usinas');
     conferir($comparacao['usinas'][0]['energia'] === [0, 120.5, 0] && $comparacao['usinas'][4]['energia'] === [0, 0, 0], 'Comparação clara mantém valores e zeros por usina');
-    $graficos = dadosGraficos(requisitar('views/dashboard.php?inicio=2025-12-01&fim=2026-03-01'));
+    $resposta = requisitar('views/dashboard.php?inicio=2025-12-01&fim=2026-03-01');
+    $graficos = dadosGraficos($resposta);
     conferir($graficos[0]['rotulos'] === ['12/2025', '01/2026', '02/2026', '03/2026'], 'Agrupamento mensal');
     conferir($graficos[0]['energia'] === [0, 120.5, 0, 0], 'Total mensal');
+    conferir($graficos[0]['estimada'] === [null, 80.25, null, null], 'Estimativas alinhadas aos meses do período mensal');
+    conferir($graficos[5]['estimada'] === [null, null, 60.25, null], 'Estimativa de fevereiro alinhada mesmo registrada no dia 28');
+    conferir(
+        strpos($resposta['corpo'], 'id="total-estimado-1">80,25 mWh</strong>') !== false
+        && strpos($resposta['corpo'], 'id="total-estimado-6">60,25 mWh</strong>') !== false,
+        'Totais estimados não duplicam valores ao agrupar por mês'
+    );
     $resposta = requisitar('views/dashboard.php?inicio=2026-02-30&fim=2026-01-01');
     conferir(strpos($resposta['corpo'], 'Informe um período válido') !== false, 'Período inválido');
 
     $token = entrar('consulta@example.com', 'SenhaTeste123');
     $respostaDark = requisitar('views/dashdark.php?usina_id=1&inicio=2026-01-01&fim=2026-01-03');
     $dark = dadosDashDark($respostaDark);
+    conferir(
+        strpos($respostaDark['corpo'], 'Energia gerada (mWh)') !== false
+        && strpos($respostaDark['corpo'], 'em mWh') !== false,
+        'DashDark apresenta produção em mWh'
+    );
     conferir($respostaDark['status'] === 200, 'DashDark disponível para consulta');
     conferir($dark['usinaId'] === 1 && count($dark['serie']) === 365, 'DashDark carrega a janela anual da usina selecionada');
+    conferir($dark['producaoEstimada'] === ['2026-01' => 80.25], 'DashDark filtra produção estimada por usina selecionada e mês');
     $porData = array_column($dark['serie'], null, 'data');
     conferir($porData['2026-01-02']['energia'] === 120.5, 'Produção do DashDark');
     conferir($porData['2026-01-02']['horas'] === 80, 'Horas extras do DashDark em reais');
@@ -339,8 +478,31 @@ try {
     conferir(substr_count($respostaDark['corpo'], '<canvas') === 4, 'Quatro gráficos no DashDark');
     conferir(count($dark['todasUsinas']) === 5 && $dark['todasUsinas'][0]['valores']['2026-01-02'] === 120.5, 'Comparação inclui todas as usinas e a produção correta');
     conferir(strpos($respostaDark['corpo'], '<script>alert(1)</script>') === false, 'Nome da usina escapado no DashDark');
+    $darkPadrao = dadosDashDark(requisitar('views/dashdark.php'));
+    conferir(
+        $darkPadrao['usinaId'] === 2
+        && $darkPadrao['inicio'] === '2026-01-01'
+        && $darkPadrao['fim'] === '2026-12-31',
+        'DashDark seleciona a UEG e o ano de 2026 por padrão'
+    );
+    conferir(
+        strpos($respostaDark['corpo'], 'assets/js/dashdark.js?v=') !== false,
+        'DashDark versiona o JavaScript para atualizar alterações em cache'
+    );
+    $filtroDarkPtBr = requisitar('views/dashdark.php?usina_id=2&inicio=01%2F09%2F2026&fim=30%2F09%2F2026');
+    $dadosFiltroDarkPtBr = dadosDashDark($filtroDarkPtBr);
+    conferir(
+        $dadosFiltroDarkPtBr['inicio'] === '2026-09-01'
+        && $dadosFiltroDarkPtBr['fim'] === '2026-09-30'
+        && strpos($filtroDarkPtBr['corpo'], 'value="01/09/2026"') !== false
+        && strpos($filtroDarkPtBr['corpo'], 'value="30/09/2026"') !== false,
+        'DashDark aceita e apresenta filtros DD/MM/AAAA'
+    );
+    $estimativaMesParcial = dadosDashDark(requisitar('views/dashdark.php?usina_id=1&inicio=2026-01-15&fim=2026-01-17'));
+    conferir($estimativaMesParcial['producaoEstimada'] === ['2026-01' => 80.25], 'Estimativa incluída quando o período começa no meio do mês');
     $outra = dadosDashDark(requisitar('views/dashdark.php?usina_id=5&inicio=2026-01-01&fim=2026-01-03'));
     conferir($outra['usinaId'] === 5 && array_sum(array_column($outra['serie'], 'energia')) === 0, 'Combobox inclui quinta usina sem misturar dados');
+    conferir($outra['producaoEstimada'] === [], 'Produção estimada não mistura usinas selecionadas');
     conferir($outra['todasUsinas'] === $dark['todasUsinas'], 'Comparação de todas as usinas independe do combobox');
     $ano = dadosDashDark(requisitar('views/dashdark.php?usina_id=1&inicio=2020-01-01&fim=2026-01-03'));
     conferir($ano['inicio'] === $ano['limiteInicial'] && count($ano['serie']) === 365, 'Servidor limita o período a 365 dias');

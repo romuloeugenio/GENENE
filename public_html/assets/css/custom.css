@@ -321,6 +321,51 @@ th {
     gap: 24px;
 }
 
+.cabecalho-card-usina {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.identificacao-usina {
+    min-width: 0;
+}
+
+.identificacao-usina h2 {
+    overflow-wrap: anywhere;
+}
+
+.identificacao-usina p {
+    margin-top: 0;
+}
+
+.resumo-energia {
+    display: grid;
+    flex-shrink: 0;
+    gap: 6px;
+    padding: 10px 14px;
+    border: 1px solid #f97316;
+    border-radius: 10px;
+    background: #fff7ed;
+}
+
+.resumo-energia p {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 0;
+    color: #607080;
+    font-size: 12px;
+    white-space: nowrap;
+}
+
+.resumo-energia strong {
+    color: #243746;
+    font-size: 14px;
+}
+
 .grafico {
     position: relative;
     height: 230px;
@@ -376,6 +421,14 @@ summary {
 }
 
 @media (max-width: 760px) {
+    .cabecalho-card-usina {
+        flex-wrap: wrap;
+    }
+
+    .resumo-energia {
+        width: 100%;
+    }
+
     .menu {
         display: none;
     }

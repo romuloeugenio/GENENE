@@ -13,13 +13,13 @@ if (!isset($titulo)) {
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title><?= escapar($titulo) ?> - <?= escapar(NOME_EMPRESA) ?></title>
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-        <link rel="stylesheet" href="<?= escapar(endereco('assets/css/custom.css')) ?>">
+        <link rel="stylesheet" href="<?= escapar(endereco('assets/css/custom.css')) ?>?v=<?= (int) filemtime(__DIR__ . '/../assets/css/custom.css') ?>">
 
         <?php if ($titulo === 'Dashboard'): ?>
             <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
         <?php endif; ?>
 
-        <script defer src="<?= escapar(endereco('assets/js/main.js')) ?>"></script>
+        <script defer src="<?= escapar(endereco('assets/js/main.js')) ?>?v=<?= (int) filemtime(__DIR__ . '/../assets/js/main.js') ?>"></script>
     </head>
     <body>
         <header class="barra-superior">

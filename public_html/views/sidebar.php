@@ -18,6 +18,7 @@ if (!isset($titulo)) {
                 <a href="<?= escapar(endereco('views/usinas/index_usinas.php')) ?>">Usinas</a>
                 <a href="<?= escapar(endereco('views/tecnicos/index_tecnicos.php')) ?>">Técnicos</a>
                 <a href="<?= escapar(endereco('views/producao/index_producao.php')) ?>">Produção de Energia</a>
+                <a href="<?= escapar(endereco('views/producao_estimada/index_producao_estimada.php')) ?>">Produção Estimada</a>
                 <a href="<?= escapar(endereco('views/despesas/index_despesas.php')) ?>">Despesas</a>
                 <a href="<?= escapar(endereco('views/categoria/index_categoria.php')) ?>">Categorias</a>
             </nav>

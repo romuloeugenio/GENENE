@@ -7,6 +7,7 @@ CREATE TABLE usuarios (
     nome VARCHAR(120) NOT NULL,
     email VARCHAR(190) NOT NULL,
     senha_hash VARCHAR(255) NOT NULL,
+    administrador VARCHAR(1) NOT NULL DEFAULT 'N',
     pode_editar ENUM('S', 'N') NOT NULL DEFAULT 'N',
     pode_excluir ENUM('S', 'N') NOT NULL DEFAULT 'N',
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -44,6 +45,16 @@ CREATE TABLE producao_energia (
     UNIQUE KEY uq_producao_usina_data (usina_id, data_producao),
     KEY idx_producao_data (data_producao),
     CONSTRAINT fk_producao_usina FOREIGN KEY (usina_id)
+        REFERENCES usinas(id) ON DELETE RESTRICT ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE producao_estimada_usina (
+    id_usina INT UNSIGNED NOT NULL,
+    mes_estimado DATE NOT NULL,
+    producao DECIMAL(12,2) UNSIGNED NOT NULL,
+    PRIMARY KEY (id_usina, mes_estimado),
+    KEY idx_producao_estimada_mes (mes_estimado),
+    CONSTRAINT fk_producao_estimada_usina FOREIGN KEY (id_usina)
         REFERENCES usinas(id) ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

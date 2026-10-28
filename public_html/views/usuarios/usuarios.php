@@ -14,6 +14,7 @@ $erros = [];
 $nome = '';
 $email = '';
 $senha = '';
+$administrador = 'N';
 $pode_editar = 'N';
 $pode_excluir = 'N';
 $senha_hash = '';
@@ -31,6 +32,7 @@ if ($id > 0) {
 
     $nome = $registro['nome'];
     $email = $registro['email'];
+    $administrador = $registro['administrador'];
     $pode_editar = $registro['pode_editar'];
     $pode_excluir = $registro['pode_excluir'];
     $senha_hash = $registro['senha_hash'];
@@ -43,6 +45,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $nome = lerCampo($_POST, 'nome');
     $email = lerCampo($_POST, 'email');
     $senha = isset($_POST['senha']) && is_string($_POST['senha']) ? $_POST['senha'] : '';
+    $administrador = lerCampo($_POST, 'administrador');
     $pode_editar = lerCampo($_POST, 'pode_editar');
     $pode_excluir = lerCampo($_POST, 'pode_excluir');
 
@@ -56,6 +59,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $erros[] = 'Informe um e-mail válido.';
+    }
+
+    if (!in_array($administrador, ['S', 'N'], true)) {
+        $erros[] = 'Administrador: selecione uma opção válida.';
     }
 
     if (($id === 0 || $senha !== '') && (strlen($senha) < 8 || strlen($senha) > 72)) {
@@ -95,16 +102,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             if ($id > 0) {
                 $consulta = $pdo->prepare(
                     'UPDATE usuarios
-                     SET nome = ?, email = ?, senha_hash = ?, pode_editar = ?, pode_excluir = ?
+                     SET nome = ?, email = ?, senha_hash = ?, administrador = ?, pode_editar = ?, pode_excluir = ?
                      WHERE id = ?'
                 );
-                $consulta->execute([$nome, $email, $senha_hash, $pode_editar, $pode_excluir, $id]);
+                $consulta->execute([$nome, $email, $senha_hash, $administrador, $pode_editar, $pode_excluir, $id]);
             } else {
                 $consulta = $pdo->prepare(
-                    'INSERT INTO usuarios (nome, email, senha_hash, pode_editar, pode_excluir)
-                     VALUES (?, ?, ?, ?, ?)'
+                    'INSERT INTO usuarios (nome, email, senha_hash, administrador, pode_editar, pode_excluir)
+                     VALUES (?, ?, ?, ?, ?, ?)'
                 );
-                $consulta->execute([$nome, $email, $senha_hash, $pode_editar, $pode_excluir]);
+                $consulta->execute([$nome, $email, $senha_hash, $administrador, $pode_editar, $pode_excluir]);
             }
 
             $pdo->commit();
@@ -166,6 +173,15 @@ require __DIR__ . '/../header.php';
                             <input type="password" id="senha" name="senha" minlength="8" maxlength="72"
                                    autocomplete="new-password" <?= $id === 0 ? 'required' : '' ?>>
                             <small>Entre 8 e 72 bytes. Ao editar, deixe em branco para manter a senha.</small>
+                        </div>
+
+                        <div class="campo">
+                            <label for="administrador">Administrador</label>
+                            <select id="administrador" name="administrador" required>
+                                <option value="">Selecione</option>
+                                <option value="S" <?= $administrador === 'S' ? 'selected' : '' ?>>Sim</option>
+                                <option value="N" <?= $administrador === 'N' ? 'selected' : '' ?>>Não</option>
+                            </select>
                         </div>
 
                         <div class="campo">

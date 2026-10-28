@@ -74,20 +74,23 @@ function proximaEtapaDark(atual, direcao) {
 }
 
 /**
- * Filtra e agrupa as quatro medidas com as mesmas datas de início e fim.
+ * Filtra e agrupa as medidas com as mesmas datas de início e fim.
  * @param {Array<Object>} serie Série diária com energia, horas extras, diárias e despesas em reais.
  * @param {string} inicio Data inicial ISO.
  * @param {string} fim Data final ISO.
+ * @param {Object} estimativas Produção estimada indexada por mês AAAA-MM.
  * @returns {Object} Rótulos, séries agrupadas, totais e indicação de agrupamento mensal.
  */
-function agruparDark(serie, inicio, fim) {
+function agruparDark(serie, inicio, fim, estimativas = {}) {
     const mensal = diasDark(inicio, fim) > 62;
     const grupos = new Map();
+    const mesesEstimadosAdicionados = new Set();
     const chaves = ['energia', 'horas', 'diarias', 'despesas'];
     const resultado = {
         mensal: mensal,
         rotulos: [],
         energia: [],
+        estimada: [],
         horas: [],
         diarias: [],
         despesas: [],
@@ -109,6 +112,7 @@ function agruparDark(serie, inicio, fim) {
             grupos.get(periodo)[chave] += Number(dia[chave]);
             resultado.totais[chave] += Number(dia[chave]);
         }
+
     }
 
     for (const [periodo, valores] of grupos) {
@@ -118,6 +122,13 @@ function agruparDark(serie, inicio, fim) {
         for (const chave of chaves) {
             resultado[chave].push(Math.round(valores[chave] * 100) / 100);
         }
+        const mes = periodo.slice(0, 7);
+        const temEstimativaNoMes = Object.prototype.hasOwnProperty.call(estimativas, mes);
+        const primeiraFaixaDoMes = !mesesEstimadosAdicionados.has(mes);
+        resultado.estimada.push(
+            temEstimativaNoMes && (mensal || primeiraFaixaDoMes) ? Number(estimativas[mes]) : null
+        );
+        mesesEstimadosAdicionados.add(mes);
     }
 
     return resultado;
@@ -131,8 +142,8 @@ function agruparDark(serie, inicio, fim) {
  */
 function configuracaoDark(chave, agrupado) {
     const cores = { energia: '#a78bfa', comparativo: '#f4be70', despesas: '#60d8ae' };
-    const nomes = { energia: 'Produção (kWh)', comparativo: 'Diárias (R$)', despesas: 'Despesas totais (R$)' };
-    const unidades = { energia: 'kWh', comparativo: 'R$', despesas: 'R$' };
+    const nomes = { energia: 'Produção (mWh)', comparativo: 'Diárias (R$)', despesas: 'Despesas totais (R$)' };
+    const unidades = { energia: 'mWh', comparativo: 'R$', despesas: 'R$' };
     const principal = chave === 'energia';
 
     const configuracao = {
@@ -234,6 +245,27 @@ function configuracaoDark(chave, agrupado) {
         configuracao.options.scales.x.ticks.maxTicksLimit = 10;
     }
 
+    if (chave === 'energia') {
+        configuracao.data.datasets.push({
+            type: 'line',
+            label: 'Produção estimada (mWh)',
+            data: agrupado.estimada,
+            borderColor: '#f97316',
+            backgroundColor: '#f97316',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.3,
+            pointRadius: agrupado.estimada.some(valor => valor !== null) ? 4 : 0,
+            pointHoverRadius: 5,
+            spanGaps: false
+        });
+        configuracao.options.plugins.legend = {
+            display: true,
+            position: 'bottom',
+            labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+        };
+    }
+
     return configuracao;
 }
 
@@ -281,7 +313,7 @@ function atualizarTabelaDark() {
 /**
  * Monta linhas de produção de todas as usinas, preenchendo dias sem lançamento com zero.
  * @param {Object} agrupado Agrupamento da janela selecionada, com os rótulos do eixo horizontal.
- * @returns {Object} Configuração de linhas em kWh com uma cor e legenda por usina.
+ * @returns {Object} Configuração de linhas em mWh com uma cor e legenda por usina.
  */
 function configuracaoTodasUsinasDark(agrupado) {
     const configuracao = configuracaoDark('energia', agrupado);
@@ -290,6 +322,7 @@ function configuracaoTodasUsinasDark(agrupado) {
         const serie = dadosDark.serie.map(dia => ({
             data: dia.data,
             energia: Number(usina.valores[dia.data] || 0),
+            estimada: null,
             horas: 0,
             diarias: 0,
             despesas: 0
@@ -324,7 +357,7 @@ function configuracaoTodasUsinasDark(agrupado) {
  * @returns {void} Atualiza a página e registra o filtro na URL sem recarregar.
  */
 function atualizarPainelDark() {
-    const agrupado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim);
+    const agrupado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim, dadosDark.producaoEstimada);
     const quantidade = diasDark(inicioDark, dadosDark.fim);
 
     for (const chave of ['energia', 'horas', 'despesas', 'diarias']) {
@@ -343,8 +376,8 @@ function atualizarPainelDark() {
         }
     }
 
-    document.getElementById('inicio').value = inicioDark;
-    document.getElementById('fim').value = dadosDark.fim;
+    document.getElementById('inicio').value = dataTextoDark(inicioDark);
+    document.getElementById('fim').value = dataTextoDark(dadosDark.fim);
     document.getElementById('periodo-visivel').textContent = dataTextoDark(inicioDark) + ' — ' + dataTextoDark(dadosDark.fim) + ' · ' + quantidade + (quantidade === 1 ? ' dia' : ' dias');
     document.getElementById('agrupamento').textContent = agrupado.mensal ? 'Valores por mês' : 'Valores por dia';
 
