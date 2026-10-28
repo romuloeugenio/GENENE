@@ -315,6 +315,62 @@ function configuracaoDark(chave, agrupado) {
 }
 
 /**
+ * Monta a produção realizada e estimada acumulada desde o primeiro dia do ano.
+ * @param {Object} agrupado Resultado de agruparDark() para o período visível.
+ * @param {string} inicio Ano inicial da acumulação no formato AAAA-MM-DD.
+ * @param {string} fim Data final ISO usada na agregação.
+ * @returns {Object} Configuração Chart.js com duas linhas acumuladas em mWh.
+ */
+function configuracaoEnergiaAcumuladaDark(agrupado, inicio, fim) {
+    const anoInicial = inicio.slice(0, 4) + '-01-01';
+    const acumulado = agruparDark(dadosDark.serie, anoInicial, fim, dadosDark.producaoEstimada);
+    const somar = valores => {
+        let total = 0;
+        let encontrouValor = false;
+
+        return valores.map(valor => {
+            if (valor === null) {
+                return encontrouValor ? total : null;
+            }
+            encontrouValor = true;
+            total += Number(valor || 0);
+            return Math.round(total * 100) / 100;
+        });
+    };
+
+    const modelo = configuracaoDark('energia', acumulado);
+    modelo.data.datasets = [
+        {
+            type: 'line',
+            label: 'Produção acumulada (mWh)',
+            data: somar(acumulado.energia),
+            borderColor: '#a78bfa',
+            backgroundColor: 'rgba(167, 139, 250, 0.12)',
+            borderWidth: 2,
+            fill: true,
+            tension: 0.3,
+            pointRadius: acumulado.rotulos.length < 15 ? 3 : 0,
+            pointHoverRadius: 5
+        },
+        {
+            type: 'line',
+            label: 'Produção estimada acumulada (mWh)',
+            data: somar(acumulado.estimada),
+            borderColor: '#f97316',
+            backgroundColor: '#f97316',
+            borderWidth: 2,
+            fill: false,
+            tension: 0.3,
+            pointRadius: acumulado.estimada.some(valor => valor !== null) ? 4 : 0,
+            pointHoverRadius: 5,
+            spanGaps: false
+        }
+    ];
+    modelo.options.scales.x.ticks.maxTicksLimit = 10;
+    return modelo;
+}
+
+/**
  * Converte séries financeiras em acumulados desde o início do intervalo selecionado.
  * @param {Object} agrupado Resultado diário ou mensal de agruparDark().
  * @returns {Object} Configuração Chart.js com todas as séries em linhas.
@@ -454,11 +510,13 @@ function atualizarPainelDark() {
         document.getElementById('total-' + chave).textContent = agrupado.totais[chave].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    for (const chave of ['energia', 'comparativo', 'acumulado', 'despesas', 'usinas']) {
+    for (const chave of ['energia', 'energia-acumulada', 'comparativo', 'acumulado', 'despesas', 'usinas']) {
         if (typeof Chart !== 'undefined') {
             let configuracao;
             if (chave === 'usinas') {
                 configuracao = configuracaoTodasUsinasDark(agrupado);
+            } else if (chave === 'energia-acumulada') {
+                configuracao = configuracaoEnergiaAcumuladaDark(agrupado, inicioDark, dadosDark.fim);
             } else if (chave === 'acumulado') {
                 configuracao = configuracaoAcumuladaDark(agrupado);
             } else {

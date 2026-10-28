@@ -132,7 +132,7 @@ function executarTestesDashDark() {
         ]
     });
     iniciarDark();
-    conferirDark(graficosTeste.length === 5, 'Cinco gráficos inicializados');
+    conferirDark(graficosTeste.length === 6, 'Seis gráficos inicializados');
     conferirDark(
         document.getElementById('inicio').value === '02/12/2025'
         && document.getElementById('fim').value === '31/12/2025',
@@ -154,6 +154,12 @@ function executarTestesDashDark() {
     );
     conferirDark(producao[1].data.filter(valor => valor !== null).length === 1 && producao[1].data.includes(180), 'Série estimada respeita o período visível');
     conferirDark(producao[1].pointRadius > 0, 'Estimativa mensal isolada permanece visível em período diário');
+    const producaoAcumulada = graficosTeste[1];
+    conferirDark(producaoAcumulada.data.datasets.length === 2, 'Gráfico acumulado possui produção realizada e estimada');
+    conferirDark(producaoAcumulada.data.datasets.every(serie => serie.type === 'line'), 'Produções acumuladas são representadas em linhas');
+    conferirDark(producaoAcumulada.data.labels.length === 12, 'Produção acumulada começa no primeiro dia do ano e agrupa por mês');
+    conferirDark(producaoAcumulada.data.datasets[0].data.at(-1) === 3650, 'Produção acumulada termina no total anual visível');
+    conferirDark(producaoAcumulada.data.datasets[1].data.at(-1) === 300, 'Produção estimada acumulada soma as estimativas disponíveis no ano');
     const area = document.getElementById('area-producao');
     conferirDark(typeof area.listeners.wheel === 'undefined', 'Gráfico não intercepta a roda do mouse');
 
@@ -161,16 +167,16 @@ function executarTestesDashDark() {
         selecionarPeriodoDark({ currentTarget: { dataset: { dias: String(dias) } } });
         conferirDark(diasDark(inicioDark, dadosDark.fim) === dias, 'Botão aplica período de ' + dias + ' dias');
         const agrupado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim);
-        conferirDark(graficosTeste.every(grafico => grafico.data.labels.length === agrupado.rotulos.length), 'Cinco gráficos sincronizados em ' + dias + ' dias');
+        conferirDark(graficosTeste.filter((grafico, indice) => indice !== 1).every(grafico => grafico.data.labels.length === agrupado.rotulos.length), 'Cinco gráficos do período sincronizados em ' + dias + ' dias');
     }
 
     conferirDark(graficosTeste[0].data.datasets[0].data.reduce((a, b) => a + b, 0) === 3650, 'Botão 1A recupera dados fora do filtro inicial');
-    conferirDark(graficosTeste[4].data.datasets[0].data.reduce((a, b) => a + b, 0) === 120, 'Comparação soma os meses do ano');
+    conferirDark(graficosTeste[5].data.datasets[0].data.reduce((a, b) => a + b, 0) === 120, 'Produção de todas as usinas soma os meses do ano');
     conferirDark(document.getElementById('tabela-producao').children.length === 2, 'Tabela acompanha o botão 1A');
     conferirDark(window.location.href.includes('inicio=2025-01-01'), 'URL preserva o intervalo visível');
     selecionarPeriodoDark({ currentTarget: { dataset: { dias: '30' } } });
     conferirDark(document.getElementById('tabela-producao').children.length === 1, 'Tabela acompanha a redução para 30D');
-    const misto = graficosTeste[1];
+    const misto = graficosTeste[2];
     conferirDark(misto.data.datasets.length === 5, 'Comparativo possui cinco séries');
     conferirDark(misto.data.datasets[0].type === 'bar' && misto.data.datasets.slice(1).every(serie => serie.type === 'line'), 'Diárias em barras e despesas operacionais em linhas');
     conferirDark(misto.data.datasets[0].data.reduce((a, b) => a + b, 0) === 30, 'Barras incluem somente diárias no período de 30 dias');
@@ -179,13 +185,13 @@ function executarTestesDashDark() {
     conferirDark(misto.data.datasets[2].label === 'MATERIAIS (R$)' && misto.data.datasets[3].label === 'SERVIÇOS (R$)' && misto.data.datasets[4].label === 'MAT/SERVIÇO (R$)', 'Categorias 4, 5 e 6 aparecem como linhas');
     conferirDark(misto.options.scales.diarias.position === 'left' && misto.options.scales.horas.position === 'right', 'Dois eixos verticais independentes');
     conferirDark(misto.data.datasets[0].yAxisID === 'diarias' && misto.data.datasets[1].yAxisID === 'horas', 'Cada série usa seu próprio eixo');
-    const acumulado = graficosTeste[2];
+    const acumulado = graficosTeste[3];
     conferirDark(acumulado.data.datasets.length === 5 && acumulado.data.datasets.every(serie => serie.type === 'line'), 'Acumulado possui cinco séries em linhas');
     conferirDark(acumulado.data.datasets[0].data.at(-1) === 30, 'Diárias acumulam o total no fim do período');
     conferirDark(acumulado.data.datasets[1].data.at(-1) === 60, 'Horas extras acumulam o total no fim do período');
     conferirDark(acumulado.data.datasets.slice(2).every(serie => serie.data.at(-1) > 0), 'Categorias adicionais acumulam seus valores');
-    conferirDark(graficosTeste[3].data.datasets[0].data.reduce((a, b) => a + b, 0) === 90, 'Despesas totais incluem todas as categorias no período');
-    const todas = graficosTeste[4].data.datasets;
+    conferirDark(graficosTeste[4].data.datasets[0].data.reduce((a, b) => a + b, 0) === 90, 'Despesas totais incluem todas as categorias no período');
+    const todas = graficosTeste[5].data.datasets;
     conferirDark(todas.length === 3 && todas[1].label === 'Usina B', 'Cada usina tem sua própria linha');
     conferirDark(todas[0].data.reduce((a, b) => a + b, 0) === 20 && todas[1].data.reduce((a, b) => a + b, 0) === 70, 'Período filtra cada usina sem misturar valores');
     conferirDark(todas[2].data.every(valor => valor === 0), 'Usina sem lançamentos aparece com zeros');
