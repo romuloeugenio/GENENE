@@ -22,7 +22,7 @@ Para atualizar outra instalação antiga, faça backup e execute, uma única vez
 
 Para atualizar um banco já instalado com a Produção Estimada, execute `C:\xampp\php\php.exe migrations\aplicar_producao_estimada.php` no diretório do projeto. O script cria a tabela se ela ainda não existir.
 
-O teste `C:\xampp\php\php.exe tests/migracao_despesas.php` passou em 9 verificações de preservação de dados e chaves estrangeiras em um banco temporário. A suíte HTTP passou em 150 verificações, e a sincronização do DashDark em 34 verificações JavaScript.
+O teste `C:\xampp\php\php.exe tests/migracao_despesas.php` passou em 9 verificações de preservação de dados e chaves estrangeiras em um banco temporário. A suíte HTTP passou em 150 verificações, e a sincronização do DashDark em 53 verificações JavaScript.
 
 Acesse **http://localhost/gerene/**.
 
@@ -75,7 +75,7 @@ Para entender o fluxo, comece por `views/usinas/usinas.php`: carregamento do reg
 - As chaves estrangeiras impedem excluir uma usina ou técnico que ainda tenha lançamentos.
 - A pesquisa instantânea filtra as linhas já carregadas; a tabela tem altura máxima de 400 px.
 - O dashboard mostra cards de todas as usinas por ID. Cada card apresenta os totais de energia gerada e estimada no período selecionado. Os gráficos individuais de produção exibem a energia realizada e a estimativa mensal da mesma usina; em períodos diários, a estimativa aparece uma vez no primeiro dia visível do mês. Soma cada medida separadamente, incluindo zeros para períodos sem dados. Intervalos de até 63 dias inclusivos agrupam por dia; maiores agrupam por mês. O limite é 3.660 dias.
-- O comparativo soma por dia ou mês as despesas das categorias 4 MATERIAIS, 5 SERVIÇOS e 6 MAT/SERVIÇO em linhas separadas, além da linha de HORAS EXTRAS. As barras do comparativo mostram somente DIARIAS. O gráfico inferior mostra todas as despesas, sem somar novamente as séries do comparativo. Os valores podem ser consultados em tabelas.
+- O comparativo soma por dia ou mês as despesas das categorias 4 MATERIAIS, 5 SERVIÇOS e 6 MAT/SERVIÇO em linhas separadas, além da linha de HORAS EXTRAS. As barras do comparativo mostram somente DIARIAS. Um gráfico acumulado separado mantém essas cinco séries como linhas e reinicia a soma no início do período selecionado. O gráfico inferior mostra todas as despesas, sem somar novamente as séries do comparativo. Os valores podem ser consultados em tabelas.
 - Tailwind e Chart.js continuam sendo carregados por CDN, conforme a solicitação original. Os gráficos precisam de internet para carregar a biblioteca; as tabelas de valores permanecem disponíveis. O CSS local mantém o layout básico.
 
 ## Instalar em outro XAMPP
@@ -108,7 +108,7 @@ Os cadastros usam o nome da pasta: o formulário é <pasta>.php e a listagem é 
 
 O DashDark é a página inicial após o login e está em **http://localhost/gerene/views/dashdark.php**. O menu lateral oferece **DashDark** e **Dashboard**; o segundo mantém o painel clássico.
 
-O novo layout usa Tailwind via CDN diretamente no HTML, com tema escuro independente de `custom.css`. A referência de organização visual é o [Vireo](https://vireo.jawad.work/src/html/dashboards/hr.html), adaptada aos dados de usinas. O gráfico principal usa [linha com preenchimento no Chart.js](https://www.chartjs.org/docs/latest/charts/line.html) para produção de energia em mWh. O painel comparativo usa DIARIAS em barras no eixo esquerdo e HORAS EXTRAS em linha no eixo direito, ambos em R$. Abaixo, outro gráfico mostra as despesas totais de todas as categorias.
+O novo layout usa Tailwind via CDN diretamente no HTML, com tema escuro independente de `custom.css`. A referência de organização visual é o [Vireo](https://vireo.jawad.work/src/html/dashboards/hr.html), adaptada aos dados de usinas. O gráfico principal usa [linha com preenchimento no Chart.js](https://www.chartjs.org/docs/latest/charts/line.html) para produção de energia em mWh. O painel comparativo usa DIARIAS em barras no eixo esquerdo e HORAS EXTRAS, MATERIAIS (4), SERVIÇOS (5) e MAT/SERVIÇO (6) em linhas no eixo direito, todos em R$. O painel seguinte acumula essas cinco séries em linhas desde o início do período. Abaixo, outro gráfico mostra as despesas totais de todas as categorias.
 
 1. Escolha as datas no formato **DD/MM/AAAA** e a usina no topo. O período inicial é de 01/01/2026 a 31/12/2026. Todas as usinas cadastradas estão disponíveis; a UEG (ID 2) é selecionada inicialmente, ou a primeira usina se a UEG não estiver cadastrada.
 2. Clique em **Aplicar período**. Alterar a usina também aplica o formulário automaticamente quando JavaScript está ativo.
@@ -129,8 +129,8 @@ Foram acrescentadas 100 despesas na categoria HORAS EXTRAS: 20 por cada uma das 
 
 ## Gráficos financeiros com dois eixos
 
-Nos dashboards claro e escuro, o comparativo tem exatamente duas séries da tabela despesas: categoria HORAS EXTRAS em linha (eixo direito, R$) e categoria DIARIAS em barras (eixo esquerdo, R$). As escalas verticais são independentes e identificadas pela categoria; a altura visual de séries em eixos diferentes não implica valores iguais. Outras categorias não entram nesse comparativo.
+Nos dashboards claro e escuro, o comparativo usa DIARIAS em barras no eixo esquerdo e coloca HORAS EXTRAS, MATERIAIS (4), SERVIÇOS (5) e MAT/SERVIÇO (6) em linhas no eixo direito. As escalas verticais são independentes e identificadas pelas categorias; a altura visual de séries em eixos diferentes não implica valores iguais.
 
 Abaixo dele, Despesas Totais mostra todas as categorias em um gráfico de barras separado, usando o mesmo período e usina. Produção e consulta dos valores da tabela foram preservadas. Os botões 7D, 30D, 3M, 6M e 1A atualizam todos os gráficos: no DashDark sem recarregar, no dashboard claro aplicando o filtro GET. A roda do mouse continua sem alterar o período.
 
-Validação: 150 verificações HTTP e 34 verificações JavaScript, além da conferência das séries e eixos do gráfico claro. Nenhum lançamento do banco foi alterado.
+Validação: 150 verificações HTTP e 53 verificações JavaScript, além da conferência das séries, acumulação e eixos dos gráficos claro e escuro. Nenhum lançamento do banco foi alterado.

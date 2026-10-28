@@ -111,6 +111,24 @@ if ($usinaSelecionada) {
     );
     $consulta->execute([$usinaSelecionada['id'], $limiteInicial, $fim, 'DIARIAS']);
     $diarias = $consulta->fetchAll(PDO::FETCH_KEY_PAIR);
+
+    $categoriasLinhas = [
+        4 => ['chave' => 'materiais', 'nome' => 'Materiais'],
+        5 => ['chave' => 'servicos', 'nome' => 'Serviços'],
+        6 => ['chave' => 'mat_servico', 'nome' => 'Mat/Serviço'],
+    ];
+    $valoresCategorias = [];
+    $consulta = $pdo->prepare(
+        'SELECT data, SUM(valor_despesa) AS total
+         FROM despesas
+         WHERE usina_id = ? AND data BETWEEN ? AND ? AND categoria = ?
+         GROUP BY data ORDER BY data'
+    );
+    foreach ($categoriasLinhas as $categoriaId => $categoria) {
+        $consulta->execute([$usinaSelecionada['id'], $limiteInicial, $fim, $categoriaId]);
+        $valoresCategorias[$categoria['chave']] = $consulta->fetchAll(PDO::FETCH_KEY_PAIR);
+    }
+
     $consulta = $pdo->prepare(
         'SELECT data, SUM(valor_despesa) AS total
          FROM despesas
@@ -143,6 +161,9 @@ while ($cursor <= $dataFinal) {
         'energia' => (float) ($energia[$data] ?? 0),
         'diarias' => (float) ($diarias[$data] ?? 0),
         'horas' => (float) ($horas[$data] ?? 0),
+        'materiais' => (float) ($valoresCategorias['materiais'][$data] ?? 0),
+        'servicos' => (float) ($valoresCategorias['servicos'][$data] ?? 0),
+        'mat_servico' => (float) ($valoresCategorias['mat_servico'][$data] ?? 0),
         'despesas' => (float) ($despesas[$data] ?? 0)
     ];
     $serie[] = $dia;
@@ -363,9 +384,14 @@ if (podeEditar() && podeExcluir()) {
 
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <h2 class="font-semibold text-white">Horas extras e diárias</h2>
-                        <p class="mt-2 text-xs text-slate-400">Linha: HORAS EXTRAS (eixo direito). Barras: DIARIAS (eixo esquerdo). Escalas independentes em reais.</p>
                         <div class="relative mt-5 h-80">
                             <canvas id="grafico-comparativo" role="img" aria-label="Horas extras em linha e diárias em barras, com eixos independentes em reais"></canvas>
+                        </div>
+                    </section>
+                    <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
+                        <h2 class="font-semibold text-white">Despesas acumuladas</h2>
+                        <div class="relative mt-5 h-80">
+                            <canvas id="grafico-acumulado" role="img" aria-label="Valores acumulados de diárias, horas extras, materiais, serviços e mat/serviço em linhas"></canvas>
                         </div>
                     </section>
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">

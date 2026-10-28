@@ -471,7 +471,10 @@ try {
     $porData = array_column($dark['serie'], null, 'data');
     conferir($porData['2026-01-02']['energia'] === 120.5, 'Produção do DashDark');
     conferir($porData['2026-01-02']['horas'] === 80, 'Horas extras do DashDark em reais');
-    conferir($porData['2026-01-02']['despesas'] === 325.2, 'Despesas do DashDark incluem a categoria de horas extras');
+    conferir($porData['2026-01-02']['materiais'] === 40, 'DashDark inclui a categoria MATERIAIS');
+    conferir($porData['2026-01-02']['servicos'] === 50, 'DashDark inclui a categoria SERVIÇOS');
+    conferir($porData['2026-01-02']['mat_servico'] === 60, 'DashDark inclui a categoria MAT/SERVIÇO');
+    conferir($porData['2026-01-02']['despesas'] === 430, 'Despesas do DashDark incluem todas as categorias operacionais');
     conferir($porData['2026-01-02']['diarias'] === 200, 'Diárias do DashDark vêm da categoria');
     conferir($porData['2026-01-01']['energia'] === 0, 'Dia sem produção no DashDark');
     conferir(count($dark['producao']) === 1, 'Tabela de produção da usina selecionada');

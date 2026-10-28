@@ -75,7 +75,7 @@ function proximaEtapaDark(atual, direcao) {
 
 /**
  * Filtra e agrupa as medidas com as mesmas datas de início e fim.
- * @param {Array<Object>} serie Série diária com energia, horas extras, diárias e despesas em reais.
+ * @param {Array<Object>} serie Série diária com produção e despesas operacionais em reais.
  * @param {string} inicio Data inicial ISO.
  * @param {string} fim Data final ISO.
  * @param {Object} estimativas Produção estimada indexada por mês AAAA-MM.
@@ -85,7 +85,7 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
     const mensal = diasDark(inicio, fim) > 62;
     const grupos = new Map();
     const mesesEstimadosAdicionados = new Set();
-    const chaves = ['energia', 'horas', 'diarias', 'despesas'];
+    const chaves = ['energia', 'horas', 'diarias', 'materiais', 'servicos', 'mat_servico', 'despesas'];
     const resultado = {
         mensal: mensal,
         rotulos: [],
@@ -93,6 +93,9 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
         estimada: [],
         horas: [],
         diarias: [],
+        materiais: [],
+        servicos: [],
+        mat_servico: [],
         despesas: [],
         totais: { energia: 0, horas: 0, diarias: 0, despesas: 0 }
     };
@@ -105,12 +108,15 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
         const periodo = mensal ? dia.data.slice(0, 7) : dia.data;
 
         if (!grupos.has(periodo)) {
-            grupos.set(periodo, { energia: 0, horas: 0, diarias: 0, despesas: 0 });
+            grupos.set(periodo, { energia: 0, horas: 0, diarias: 0, materiais: 0, servicos: 0, mat_servico: 0, despesas: 0 });
         }
 
         for (const chave of chaves) {
-            grupos.get(periodo)[chave] += Number(dia[chave]);
-            resultado.totais[chave] += Number(dia[chave]);
+            const valor = Number(dia[chave] || 0);
+            grupos.get(periodo)[chave] += valor;
+            if (Object.prototype.hasOwnProperty.call(resultado.totais, chave)) {
+                resultado.totais[chave] += valor;
+            }
         }
 
     }
@@ -222,6 +228,45 @@ function configuracaoDark(chave, agrupado) {
                 pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
                 fill: false,
                 order: 1
+            },
+            {
+                type: 'line',
+                label: 'MATERIAIS (R$)',
+                data: agrupado.materiais,
+                yAxisID: 'horas',
+                borderColor: '#a78bfa',
+                backgroundColor: '#a78bfa',
+                borderWidth: 2,
+                tension: 0.25,
+                pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
+                fill: false,
+                order: 1
+            },
+            {
+                type: 'line',
+                label: 'SERVIÇOS (R$)',
+                data: agrupado.servicos,
+                yAxisID: 'horas',
+                borderColor: '#60a5fa',
+                backgroundColor: '#60a5fa',
+                borderWidth: 2,
+                tension: 0.25,
+                pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
+                fill: false,
+                order: 1
+            },
+            {
+                type: 'line',
+                label: 'MAT/SERVIÇO (R$)',
+                data: agrupado.mat_servico,
+                yAxisID: 'horas',
+                borderColor: '#f472b6',
+                backgroundColor: '#f472b6',
+                borderWidth: 2,
+                tension: 0.25,
+                pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
+                fill: false,
+                order: 1
             }
         ];
         configuracao.options.plugins.legend = {
@@ -240,7 +285,7 @@ function configuracaoDark(chave, agrupado) {
             ...eixoBase,
             position: 'right',
             grid: { drawOnChartArea: false },
-            title: { display: true, text: 'Horas extras (R$)', color: '#67d9e8' }
+            title: { display: true, text: 'Despesas operacionais (R$)', color: '#67d9e8' }
         };
         configuracao.options.scales.x.ticks.maxTicksLimit = 10;
     }
@@ -267,6 +312,51 @@ function configuracaoDark(chave, agrupado) {
     }
 
     return configuracao;
+}
+
+/**
+ * Converte séries financeiras em acumulados desde o início do intervalo selecionado.
+ * @param {Object} agrupado Resultado diário ou mensal de agruparDark().
+ * @returns {Object} Configuração Chart.js com todas as séries em linhas.
+ */
+function configuracaoAcumuladaDark(agrupado) {
+    const series = [
+        ['Diárias (R$)', agrupado.diarias, '#f4be70'],
+        ['Horas extras (R$)', agrupado.horas, '#67d9e8'],
+        ['MATERIAIS (R$)', agrupado.materiais, '#a78bfa'],
+        ['SERVIÇOS (R$)', agrupado.servicos, '#60a5fa'],
+        ['MAT/SERVIÇO (R$)', agrupado.mat_servico, '#f472b6']
+    ];
+
+    const acumulados = series.map(([label, valores, cor]) => {
+        let total = 0;
+        return {
+            type: 'line',
+            label: label,
+            data: valores.map(valor => {
+                total += Number(valor || 0);
+                return Math.round(total * 100) / 100;
+            }),
+            borderColor: cor,
+            backgroundColor: cor,
+            borderWidth: 2,
+            tension: 0.25,
+            pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
+            pointHoverRadius: 5,
+            fill: false
+        };
+    });
+
+    const modelo = configuracaoDark('despesas', agrupado);
+    modelo.type = 'line';
+    modelo.data.datasets = acumulados;
+    modelo.options.plugins.legend = {
+        display: true,
+        position: 'bottom',
+        labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+    };
+    modelo.options.scales.x.ticks.maxTicksLimit = 10;
+    return modelo;
 }
 
 /**
@@ -364,9 +454,16 @@ function atualizarPainelDark() {
         document.getElementById('total-' + chave).textContent = agrupado.totais[chave].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    for (const chave of ['energia', 'comparativo', 'despesas', 'usinas']) {
+    for (const chave of ['energia', 'comparativo', 'acumulado', 'despesas', 'usinas']) {
         if (typeof Chart !== 'undefined') {
-            const configuracao = chave === 'usinas' ? configuracaoTodasUsinasDark(agrupado) : configuracaoDark(chave, agrupado);
+            let configuracao;
+            if (chave === 'usinas') {
+                configuracao = configuracaoTodasUsinasDark(agrupado);
+            } else if (chave === 'acumulado') {
+                configuracao = configuracaoAcumuladaDark(agrupado);
+            } else {
+                configuracao = configuracaoDark(chave, agrupado);
+            }
             if (graficosDark[chave]) {
                 graficosDark[chave].data = configuracao.data;
                 graficosDark[chave].update('none');
