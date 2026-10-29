@@ -197,6 +197,10 @@ function executarTestesDashDark() {
     conferirDark(acumulado.data.datasets[0].data.at(-1) === 30, 'Diárias acumulam o total no fim do período');
     conferirDark(acumulado.data.datasets[1].data.at(-1) === 60, 'Horas extras acumulam o total no fim do período');
     conferirDark(acumulado.data.datasets.slice(2).every(serie => serie.data.at(-1) > 0), 'Categorias adicionais acumulam seus valores');
+    const baseAcumulado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim, dadosDark.producaoEstimada);
+    const agrupadoSemDespesasPosteriores = { ...baseAcumulado, diarias: baseAcumulado.diarias.map((valor, indice) => indice === 0 ? 10 : 0), horas: baseAcumulado.horas.map((valor, indice) => indice === 0 ? 20 : 0), materiais: baseAcumulado.materiais.map((valor, indice) => indice === 0 ? 30 : 0), servicos: baseAcumulado.servicos.map((valor, indice) => indice === 0 ? 40 : 0), mat_servico: baseAcumulado.mat_servico.map((valor, indice) => indice === 0 ? 50 : 0) };
+    const acumuladoSemDespesasPosteriores = configuracaoAcumuladaDark(agrupadoSemDespesasPosteriores);
+    conferirDark(acumuladoSemDespesasPosteriores.data.datasets.every(serie => serie.data.slice(1).every(valor => valor === null)), 'Cada série acumulada de despesas termina após o último mês com gasto');
     conferirDark(graficosTeste[4].data.datasets[0].data.reduce((a, b) => a + b, 0) === 90, 'Despesas totais incluem todas as categorias no período');
     const despesasTotais = graficosTeste[4];
     conferirDark(despesasTotais.data.datasets.length === 2, 'Despesas totais inclui a série de produção de energia');

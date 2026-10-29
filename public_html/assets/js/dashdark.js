@@ -433,10 +433,18 @@ function configuracaoAcumuladaDark(agrupado) {
 
     const acumulados = series.map(([label, valores, cor]) => {
         let total = 0;
+        let ultimoIndiceComDespesa = valores.findLastIndex(valor => Number(valor || 0) > 0);
+        if (ultimoIndiceComDespesa < 0) {
+            ultimoIndiceComDespesa = -1;
+        }
+
         return {
             type: 'line',
             label: label,
-            data: valores.map(valor => {
+            data: valores.map((valor, indice) => {
+                if (indice > ultimoIndiceComDespesa) {
+                    return null;
+                }
                 total += Number(valor || 0);
                 return Math.round(total * 100) / 100;
             }),

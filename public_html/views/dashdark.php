@@ -398,6 +398,7 @@ if (podeEditar() && podeExcluir()) {
                     </section>
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <h2 class="font-semibold text-white">Despesas acumuladas</h2>
+                        <p class="mt-1 text-xs text-slate-500">Cada série termina após o último mês com despesa lançada.</p>
                         <div class="relative mt-5 h-80">
                             <canvas id="grafico-acumulado" role="img" aria-label="Valores acumulados de diárias, horas extras, materiais, serviços e mat/serviço em linhas"></canvas>
                         </div>
