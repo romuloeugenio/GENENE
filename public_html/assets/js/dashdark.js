@@ -205,12 +205,21 @@ function configuracaoDark(chave, agrupado) {
     };
 
     if (chave === 'despesas') {
+        let ultimoIndiceComProducao = -1;
+        for (let indice = 0; indice < agrupado.energia.length; indice++) {
+            if (Number(agrupado.energia[indice] || 0) > 0) {
+                ultimoIndiceComProducao = indice;
+            }
+        }
+
         configuracao.data.datasets = [
             configuracao.data.datasets[0],
             {
                 type: 'line',
                 label: 'Produção de energia (mWh)',
-                data: agrupado.energia,
+                data: agrupado.energia.map((valor, indice) => (
+                    indice <= ultimoIndiceComProducao ? valor : null
+                )),
                 yAxisID: 'energia',
                 borderColor: '#a78bfa',
                 backgroundColor: 'rgba(167, 139, 250, 0.22)',

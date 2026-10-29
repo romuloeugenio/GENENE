@@ -207,6 +207,13 @@ function executarTestesDashDark() {
     conferirDark(despesasTotais.data.datasets[1].label === 'Produção de energia (mWh)' && despesasTotais.data.datasets[1].type === 'line', 'Produção de energia aparece com o nome solicitado em linha');
     conferirDark(despesasTotais.data.datasets[1].fill === 'origin' && despesasTotais.data.datasets[1].yAxisID === 'energia', 'Produção de energia usa área e eixo próprio em mWh');
     conferirDark(despesasTotais.options.scales.energia.title.text === 'Produção de energia (mWh)', 'Eixo da produção identifica a unidade mWh');
+    const despesasComProducaoIntermitente = agruparDark(
+        serie.map((dia, indice) => ({ ...dia, energia: indice < 100 ? 10 : 0 })),
+        '2025-01-01',
+        '2025-12-31'
+    );
+    const serieProducaoComZerosFinais = configuracaoDark('despesas', despesasComProducaoIntermitente).data.datasets[1].data;
+    conferirDark(serieProducaoComZerosFinais.at(-1) === null && serieProducaoComZerosFinais.some(valor => valor > 0), 'Área de produção termina quando os períodos seguintes somam zero');
     const todas = graficosTeste[5].data.datasets;
     conferirDark(todas.length === 3 && todas[1].label === 'Usina B', 'Cada usina tem sua própria linha');
     conferirDark(todas[0].data.reduce((a, b) => a + b, 0) === 20 && todas[1].data.reduce((a, b) => a + b, 0) === 70, 'Período filtra cada usina sem misturar valores');
