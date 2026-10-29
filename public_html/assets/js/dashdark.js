@@ -370,13 +370,27 @@ function configuracaoEnergiaAcumuladaDark(agrupado, inicio, fim) {
             return Math.round(total * 100) / 100;
         });
     };
+    const somarOcultandoZerosFinais = valores => {
+        let ultimoIndiceComProducao = -1;
+        for (let indice = 0; indice < valores.length; indice++) {
+            if (Number(valores[indice] || 0) > 0) {
+                ultimoIndiceComProducao = indice;
+            }
+        }
+
+        if (ultimoIndiceComProducao < 0) {
+            return valores.map(() => null);
+        }
+
+        return somar(valores).map((valor, indice) => indice <= ultimoIndiceComProducao ? valor : null);
+    };
 
     const modelo = configuracaoDark('energia', acumulado);
     modelo.data.datasets = [
         {
             type: 'line',
             label: 'Produção acumulada (mWh)',
-            data: somar(acumulado.energia),
+            data: somarOcultandoZerosFinais(acumulado.energia),
             borderColor: '#a78bfa',
             backgroundColor: 'rgba(167, 139, 250, 0.12)',
             borderWidth: 2,

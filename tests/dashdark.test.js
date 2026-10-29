@@ -160,6 +160,13 @@ function executarTestesDashDark() {
     conferirDark(producaoAcumulada.data.labels.length === 12, 'Produção acumulada começa no primeiro dia do ano e agrupa por mês');
     conferirDark(producaoAcumulada.data.datasets[0].data.at(-1) === 3650, 'Produção acumulada termina no total anual visível');
     conferirDark(producaoAcumulada.data.datasets[1].data.at(-1) === 300, 'Produção estimada acumulada soma as estimativas disponíveis no ano');
+    const serieSemProducaoPosterior = dadosDark.serie.map((dia, indice) => ({ ...dia, energia: indice === 0 ? 10 : 0 }));
+    dadosDark.serie = serieSemProducaoPosterior;
+    atualizarPainelDark();
+    const producaoSemMesesPosteriores = graficosTeste[1].data.datasets[0].data;
+    conferirDark(producaoSemMesesPosteriores[0] === 10 && producaoSemMesesPosteriores.slice(1).every(valor => valor === null), 'Linha acumulada termina quando os meses seguintes somam zero');
+    dadosDark.serie = serie;
+    atualizarPainelDark();
     const area = document.getElementById('area-producao');
     conferirDark(typeof area.listeners.wheel === 'undefined', 'Gráfico não intercepta a roda do mouse');
 

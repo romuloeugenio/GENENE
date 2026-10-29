@@ -376,7 +376,7 @@ if (podeEditar() && podeExcluir()) {
 
                     <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <h2 class="font-semibold text-white">Produção acumulada da usina</h2>
-                        <p class="mt-1 text-xs text-slate-500">Acumulado desde 01/01 do ano da data inicial até a data final selecionada · mWh</p>
+                        <p class="mt-1 text-xs text-slate-500">Acumulado desde 01/01 do ano da data inicial até a data final selecionada. Após o último mês produzido, a linha não é exibida · mWh</p>
                         <div class="relative mt-5 h-80 sm:h-96">
                             <canvas id="grafico-energia-acumulada" role="img" aria-label="Produção realizada e estimada acumulada da usina em mWh desde o início do ano"></canvas>
                         </div>
