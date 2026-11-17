@@ -124,7 +124,6 @@ $obterTextoCampo = static function ($valor) use (&$obterTextoCampo) {
 
     return '';
 };
-
 try {
     if ($erroReparo !== '') {
         throw new RuntimeException($erroReparo);
@@ -220,6 +219,60 @@ try {
         throw new RuntimeException('O GLPI não retornou um token OAuth válido.');
     }
 
+    $parametrosCategorias = http_build_query(['start' => 0, 'limit' => 1000]);
+    $paginaCategorias = $executarRequisicao(
+        $apiUrl . '/v2.3/Dropdowns/ITILCategory?' . $parametrosCategorias,
+        'GET',
+        [
+            'Accept: application/json',
+            'Authorization: Bearer ' . $tokenAcesso
+        ]
+    );
+    if ($paginaCategorias['status'] < 200 || $paginaCategorias['status'] >= 300) {
+        throw new RuntimeException('A API do GLPI respondeu com HTTP ' . $paginaCategorias['status'] . ' ao consultar as categorias.');
+    }
+
+    $categorias = $paginaCategorias['dados'];
+    if (!$ehLista($categorias) && isset($categorias['data']) && is_array($categorias['data'])) {
+        $categorias = $categorias['data'];
+    }
+    if (!$ehLista($categorias)) {
+        throw new RuntimeException('A resposta de categorias do GLPI está em formato inesperado.');
+    }
+
+    $categoriaAlvoId = null;
+    foreach ($categorias as $categoria) {
+        if (!is_array($categoria)) {
+            continue;
+        }
+
+        $caminhoCategoria = preg_replace('/\s+/', ' ', trim($obterTextoCampo($categoria)));
+        if (
+            !is_string($caminhoCategoria)
+            || strcasecmp($caminhoCategoria, 'clientes > offline') !== 0
+        ) {
+            continue;
+        }
+
+        $idCategoria = filter_var($categoria['id'] ?? null, FILTER_VALIDATE_INT);
+        if ($idCategoria === false || $idCategoria < 1) {
+            throw new RuntimeException('A categoria Clientes > Offline não possui um ID válido no GLPI.');
+        }
+        if ($categoriaAlvoId !== null && $categoriaAlvoId !== $idCategoria) {
+            throw new RuntimeException('Há mais de uma categoria com o caminho Clientes > Offline; não é possível determinar qual usar.');
+        }
+        $categoriaAlvoId = $idCategoria;
+    }
+    if ($categoriaAlvoId === null) {
+        throw new RuntimeException('A categoria Clientes > Offline não foi encontrada no GLPI.');
+    }
+
+    $ehCategoriaRelatorio = static function (array $chamado) use ($categoriaAlvoId) {
+        $idCategoria = $chamado['category']['id'] ?? null;
+
+        return is_scalar($idCategoria) && (string) $idCategoria === (string) $categoriaAlvoId;
+    };
+
     $inicio = 0;
     $limite = 100;
     $filtroPeriodo = 'date=ge=' . $inicioPeriodoReparo->format('Y-m-d H:i:s')
@@ -257,6 +310,10 @@ try {
             if (!is_array($chamado) || !isset($chamado['date']) || !is_string($chamado['date'])) {
                 throw new RuntimeException('A API do GLPI não retornou a data de abertura de um chamado.');
             }
+            if (!$ehCategoriaRelatorio($chamado)) {
+                continue;
+            }
+
             $dataAbertura = $chamado['date'];
             try {
                 $abertura = new DateTimeImmutable($dataAbertura);
@@ -303,6 +360,7 @@ try {
                             'id' => isset($chamado['id']) ? (string) $chamado['id'] : '—',
                             'assunto' => $obterTextoCampo($chamado['name'] ?? $chamado['subject'] ?? $chamado['title'] ?? null),
                             'abertura' => $abertura->format('d/m/Y H:i'),
+                            'abertura_ordem' => $abertura->getTimestamp(),
                             'primeiro_atendimento' => $primeiroAtendimento->format('d/m/Y H:i'),
                             'horas' => $horasMtfr
                         ];
@@ -332,6 +390,10 @@ try {
         $quantidadePagina = count($itens);
         $inicio += $quantidadePagina;
     } while ($quantidadePagina === $limite);
+
+    usort($chamadosMtfr, static function ($a, $b) {
+        return $b['abertura_ordem'] <=> $a['abertura_ordem'];
+    });
 
     foreach ($relatorio as &$dadosMes) {
         $dadosMes['media_horas'] = $dadosMes['solucionados'] > 0
@@ -385,6 +447,9 @@ try {
                 foreach ($itens as $chamado) {
                     if (!is_array($chamado)) {
                         throw new RuntimeException('A API do GLPI retornou uma ordem em formato inválido.');
+                    }
+                    if (!$ehCategoriaRelatorio($chamado)) {
+                        continue;
                     }
 
                     $dataFim = '';
@@ -523,7 +588,7 @@ require __DIR__ . '/../views/header.php';
                 <?php endif; ?>
 
                 <div class="aviso" role="note">A conexão com o GLPI usa HTTP sem criptografia. As credenciais OAuth e o token de acesso trafegam sem proteção na rede.</div>
-                <p>Chamados abertos de <?= escapar($rotuloPeriodo) ?>, agrupados pelo mês de abertura. O horário final selecionado inclui o minuto inteiro. O SLA médio é o tempo corrido entre abertura e solução; chamados sem solução até o horário final selecionado não entram na média.</p>
+                <p>Chamados da categoria Clientes &gt; Offline abertos de <?= escapar($rotuloPeriodo) ?>, agrupados pelo mês de abertura. O horário final selecionado inclui o minuto inteiro. O SLA médio é o tempo corrido entre abertura e solução; chamados sem solução até o horário final selecionado não entram na média.</p>
 
                 <?php if ($erro === ''): ?>
                     <h2 id="titulo-sla">SLA médio por mês</h2>
@@ -540,7 +605,7 @@ require __DIR__ . '/../views/header.php';
                                 </tr>
                             </thead>
                             <tbody>
-                                <?php foreach ($periodosRelatorio as $mes => $nome): ?>
+                                <?php foreach (array_reverse($periodosRelatorio, true) as $mes => $nome): ?>
                                     <?php $dadosMes = $relatorio[$mes]; ?>
                                     <tr>
                                         <td><?= escapar($nome) ?></td>
