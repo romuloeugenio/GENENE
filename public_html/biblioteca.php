@@ -299,3 +299,88 @@ function formatarData($valor)
 
     return date('d/m/Y', strtotime($valor));
 }
+
+/**
+ * Ajusta uma data e hora para o próximo horário comercial.
+ * @param string $valor Data/hora em AAAA-MM-DD HH:MM[:SS] ou DD/MM/AAAA HH:MM[:SS].
+ * @return string Data/hora ajustada no formato AAAA-MM-DD HH:MM:SS.
+ * @throws InvalidArgumentException Quando o valor não representa uma data/hora válida.
+ */
+function dthora_comercial($valor)
+{
+    if (!is_string($valor) || strpos($valor, "\0") !== false) {
+        throw new InvalidArgumentException('Informe uma data e hora válida.');
+    }
+
+    $valor = trim($valor);
+    $formatos = [
+        ['!Y-m-d H:i:s', 'Y-m-d H:i:s'],
+        ['!Y-m-d H:i', 'Y-m-d H:i'],
+        ['!d/m/Y H:i:s', 'd/m/Y H:i:s'],
+        ['!d/m/Y H:i', 'd/m/Y H:i']
+    ];
+    $data = null;
+    foreach ($formatos as $formato) {
+        $tentativa = DateTimeImmutable::createFromFormat($formato[0], $valor);
+        $erros = DateTimeImmutable::getLastErrors();
+        if (
+            $tentativa !== false
+            && ($erros === false || ($erros['warning_count'] === 0 && $erros['error_count'] === 0))
+            && $tentativa->format($formato[1]) === $valor
+        ) {
+            $data = $tentativa;
+            break;
+        }
+    }
+
+    if ($data === null) {
+        throw new InvalidArgumentException('Informe a data e hora nos formatos AAAA-MM-DD HH:MM[:SS] ou DD/MM/AAAA HH:MM[:SS].');
+    }
+
+    $feriadosFixos = [
+        '01-01' => 'Confraternização Universal',
+        '04-21' => 'Tiradentes',
+        '05-01' => 'Dia do Trabalho',
+        '09-07' => 'Independência do Brasil',
+        '10-12' => 'Nossa Senhora Aparecida',
+        '10-24' => 'Aniversário de Goiânia',
+        '11-02' => 'Finados',
+        '11-15' => 'Proclamação da República',
+        '11-20' => 'Dia da Consciência Negra',
+        '12-25' => 'Natal'
+    ];
+    $ehDiaComercial = static function (DateTimeImmutable $data) use ($feriadosFixos) {
+        if ((int) $data->format('N') >= 6 || isset($feriadosFixos[$data->format('m-d')])) {
+            return false;
+        }
+
+        $pascoa = (new DateTimeImmutable($data->format('Y') . '-03-21'))
+            ->modify('+' . easter_days((int) $data->format('Y')) . ' days');
+        $feriadosMoveis = [
+            $pascoa->modify('-48 days')->format('m-d'),
+            $pascoa->modify('-47 days')->format('m-d'),
+            $pascoa->modify('-2 days')->format('m-d'),
+            $pascoa->modify('+60 days')->format('m-d')
+        ];
+
+        return !in_array($data->format('m-d'), $feriadosMoveis, true);
+    };
+
+    if (!$ehDiaComercial($data)) {
+        do {
+            $data = $data->modify('+1 day')->setTime(8, 0, 0);
+        } while (!$ehDiaComercial($data));
+
+        return $data->format('Y-m-d H:i:s');
+    }
+
+    if ($data->format('H:i') < '08:00') {
+        $data = $data->setTime(8, 0, 0);
+    } elseif ($data->format('H:i') > '18:00') {
+        do {
+            $data = $data->modify('+1 day')->setTime(8, 0, 0);
+        } while (!$ehDiaComercial($data));
+    }
+
+    return $data->format('Y-m-d H:i:s');
+}

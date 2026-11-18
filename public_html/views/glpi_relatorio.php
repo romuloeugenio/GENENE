@@ -4,6 +4,7 @@ require_once __DIR__ . '/../biblioteca.php';
 
 exigirLogin();
 
+$LimiteParaMostrar = 0.16;
 $titulo = 'Relatório GLPI';
 $meses = [
     '01' => 'Janeiro',
@@ -22,9 +23,6 @@ $meses = [
 $relatorio = [];
 $resumoMtfr = [];
 $periodosRelatorio = [];
-$horasExibidasZero = static function ($horas) {
-    return number_format($horas, 2, '.', '') === '0.00';
-};
 $agora = new DateTimeImmutable('now');
 $fimPeriodoPadrao = $agora->setTime((int) $agora->format('H'), (int) $agora->format('i'), 0);
 $agoraIso = $fimPeriodoPadrao->format('Y-m-d\TH:i');
@@ -64,14 +62,16 @@ $agrupamentoReparo = 'mes';
 $ordensReparo = [];
 $reparosSemInicio = 0;
 $reparosInvalidos = 0;
-$reparosZero = 0;
+$reparosAbaixoLimite = 0;
 $dadosGraficoReparo = ['rotulos' => [], 'medias' => []];
 $dadosGraficoSla = ['rotulos' => [], 'medias' => []];
 $dadosGraficoMtfr = ['rotulos' => [], 'medias' => []];
+$dadosGraficoIndicadores = ['rotulos' => [], 'sla' => [], 'mtfr' => [], 'mttr' => []];
 $chamadosMtfr = [];
 $tratativasSemInicioMtfr = 0;
 $tratativasInvalidasMtfr = 0;
-$tratativasZeroMtfr = 0;
+$tratativasAbaixoLimiteMtfr = 0;
+$slasAbaixoLimite = 0;
 $erroReparo = '';
 $inicioPeriodoReparo = $converterDataHora($dataInicialReparo);
 $fimDataReparo = $converterDataHora($dataFinalReparo);
@@ -347,20 +347,29 @@ try {
                     throw new RuntimeException('O GLPI retornou um horário inválido de primeiro atendimento.');
                 }
 
-                if ($primeiroAtendimento < $abertura) {
+                try {
+                    $dataAberturaComercial = $abertura
+                        ->setTimezone(new DateTimeZone(date_default_timezone_get()))
+                        ->format('Y-m-d H:i:s');
+                    $aberturaMtfr = new DateTimeImmutable(dthora_comercial($dataAberturaComercial));
+                } catch (Exception $excecao) {
+                    throw new RuntimeException('O GLPI retornou uma data de abertura inválida para o cálculo do MTFR.');
+                }
+
+                if ($primeiroAtendimento < $aberturaMtfr) {
                     $tratativasInvalidasMtfr++;
                 } else {
-                    $horasMtfr = ($primeiroAtendimento->getTimestamp() - $abertura->getTimestamp()) / 3600;
-                    if ($horasExibidasZero($horasMtfr)) {
-                        $tratativasZeroMtfr++;
+                    $horasMtfr = ($primeiroAtendimento->getTimestamp() - $aberturaMtfr->getTimestamp()) / 3600;
+                    if ($horasMtfr < $LimiteParaMostrar) {
+                        $tratativasAbaixoLimiteMtfr++;
                     } else {
                         $resumoMtfr[$mes]['soma_horas'] += $horasMtfr;
                         $resumoMtfr[$mes]['quantidade']++;
                         $chamadosMtfr[] = [
                             'id' => isset($chamado['id']) ? (string) $chamado['id'] : '—',
                             'assunto' => $obterTextoCampo($chamado['name'] ?? $chamado['subject'] ?? $chamado['title'] ?? null),
-                            'abertura' => $abertura->format('d/m/Y H:i'),
-                            'abertura_ordem' => $abertura->getTimestamp(),
+                            'abertura' => $aberturaMtfr->format('d/m/Y H:i'),
+                            'abertura_ordem' => $aberturaMtfr->getTimestamp(),
                             'primeiro_atendimento' => $primeiroAtendimento->format('d/m/Y H:i'),
                             'horas' => $horasMtfr
                         ];
@@ -383,7 +392,13 @@ try {
                 continue;
             }
 
-            $relatorio[$mes]['soma_horas'] += ($solucao->getTimestamp() - $abertura->getTimestamp()) / 3600;
+            $horasSla = ($solucao->getTimestamp() - $abertura->getTimestamp()) / 3600;
+            if ($horasSla < $LimiteParaMostrar) {
+                $slasAbaixoLimite++;
+                continue;
+            }
+
+            $relatorio[$mes]['soma_horas'] += $horasSla;
             $relatorio[$mes]['solucionados']++;
         }
 
@@ -497,8 +512,8 @@ try {
                     }
 
                     $horasReparo = ($fimReparo->getTimestamp() - $inicioReparo->getTimestamp()) / 3600;
-                    if ($horasExibidasZero($horasReparo)) {
-                        $reparosZero++;
+                    if ($horasReparo < $LimiteParaMostrar) {
+                        $reparosAbaixoLimite++;
                         continue;
                     }
 
@@ -558,6 +573,30 @@ try {
     $erro = $excecao->getMessage();
 }
 
+$reparosPorMes = [];
+$quantidadeSlaSelecionada = 0;
+$quantidadeMtfrSelecionada = 0;
+foreach ($ordensReparo as $ordem) {
+    $mesReparo = $ordem['data_fim']->format('Y-m');
+    if (!isset($reparosPorMes[$mesReparo])) {
+        $reparosPorMes[$mesReparo] = ['soma_horas' => 0, 'quantidade' => 0];
+    }
+
+    $reparosPorMes[$mesReparo]['soma_horas'] += $ordem['horas'];
+    $reparosPorMes[$mesReparo]['quantidade']++;
+}
+foreach ($periodosRelatorio as $mes => $nome) {
+    $dadosGraficoIndicadores['rotulos'][] = $nome;
+    $dadosGraficoIndicadores['sla'][] = $relatorio[$mes]['media_horas'];
+    $dadosGraficoIndicadores['mtfr'][] = $resumoMtfr[$mes]['media_horas'];
+    $quantidadeSlaSelecionada += $relatorio[$mes]['solucionados'];
+    $quantidadeMtfrSelecionada += $resumoMtfr[$mes]['quantidade'];
+    $dadosGraficoIndicadores['mttr'][] = isset($reparosPorMes[$mes])
+        ? $reparosPorMes[$mes]['soma_horas'] / $reparosPorMes[$mes]['quantidade']
+        : null;
+}
+$quantidadeMttrSelecionada = count($ordensReparo);
+
 $rotuloPeriodo = $inicioPeriodoReparo !== null
     ? $inicioPeriodoReparo->format('d/m/Y H:i') . ' a ' . $fimDataReparo->format('d/m/Y H:i')
     : $dataInicialReparo . ' a ' . $dataFinalReparo;
@@ -565,6 +604,21 @@ $rotuloPeriodo = $inicioPeriodoReparo !== null
 require __DIR__ . '/../views/header.php';
 
 ?>
+            <div id="glpi-loading-overlay" class="loading-overlay" role="status" aria-live="polite" hidden>
+                <div class="loading-overlay-conteudo">
+                    <span class="loading-overlay-spinner" aria-hidden="true"></span>
+                    <span>Carregando relatório GLPI...</span>
+                </div>
+            </div>
+            <script>
+                const overlayInicialGlpi = document.getElementById('glpi-loading-overlay');
+                overlayInicialGlpi.hidden = false;
+                document.body.setAttribute('aria-busy', 'true');
+                window.addEventListener('load', function () {
+                    overlayInicialGlpi.hidden = true;
+                    document.body.removeAttribute('aria-busy');
+                }, {once: true});
+            </script>
             <section class="painel" aria-label="Seleção do período do relatório">
                 <form method="get" action="<?= escapar(endereco('views/glpi_relatorio.php')) ?>" class="filtro-periodo">
                     <div class="w-60">
@@ -582,40 +636,136 @@ require __DIR__ . '/../views/header.php';
                 </form>
             </section>
 
+            <section class="painel" aria-labelledby="titulo-grafico-indicadores">
+                <h2 id="titulo-grafico-indicadores">INDICADORES DE ATENDIMENTO E REPAROS</h2>
+                <p>SLA e MTFR são agrupados pelo mês de abertura; MTTR, pelo mês de conclusão. Valores em horas. Não são considerados Tickets abaixo de 10 minutos</p>
+                <?php if ($erro !== ''): ?>
+                    <div class="aviso" role="note">Não foi possível gerar o gráfico porque a consulta principal do GLPI falhou.</div>
+                <?php elseif ($erroReparo !== ''): ?>
+                    <div class="aviso" role="note">Não foi possível gerar o gráfico: <?= escapar($erroReparo) ?></div>
+                <?php elseif ($dadosGraficoIndicadores['rotulos'] === []): ?>
+                    <div class="aviso" role="note">Selecione um período válido para visualizar os indicadores.</div>
+                <?php else: ?>
+                    <div class="grafico">
+                        <canvas id="grafico-indicadores" role="img" aria-label="Gráfico de área mensal com as séries de SLA, MTFR e MTTR, em horas"></canvas>
+                    </div>
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function () {
+                            const canvas = document.getElementById('grafico-indicadores');
+                            if (typeof Chart === 'undefined') {
+                                canvas.insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
+                                return;
+                            }
+                            const contexto = canvas.getContext('2d');
+                            const criarDegrade = function (cor, opacidade) {
+                                const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
+                                degrade.addColorStop(0, 'rgba(' + cor + ', ' + opacidade + ')');
+                                degrade.addColorStop(1, 'rgba(' + cor + ', 0.02)');
+                                return degrade;
+                            };
+                            const dados = <?= json_encode($dadosGraficoIndicadores, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?>;
+                            new Chart(canvas, {
+                                type: 'line',
+                                data: {
+                                    labels: dados.rotulos,
+                                    datasets: [
+                                        {
+                                            label: 'SLA',
+                                            data: dados.sla,
+                                            borderColor: '#4285F4',
+                                            backgroundColor: criarDegrade('66, 133, 244', 0.3),
+                                            fill: true,
+                                            tension: 0.35,
+                                            pointRadius: 3,
+                                            spanGaps: false
+                                        },
+                                        {
+                                            label: 'MTFR',
+                                            data: dados.mtfr,
+                                            borderColor: '#34A853',
+                                            backgroundColor: criarDegrade('52, 168, 83', 0.3),
+                                            fill: true,
+                                            tension: 0.35,
+                                            pointRadius: 3,
+                                            spanGaps: false
+                                        },
+                                        {
+                                            label: 'MTTR',
+                                            data: dados.mttr,
+                                            borderColor: '#f97316',
+                                            backgroundColor: criarDegrade('249, 115, 22', 0.35),
+                                            fill: true,
+                                            tension: 0.35,
+                                            pointRadius: 3,
+                                            spanGaps: false
+                                        }
+                                    ]
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    interaction: {mode: 'index', intersect: false},
+                                    plugins: {
+                                        legend: {position: 'bottom'},
+                                        tooltip: {
+                                            callbacks: {
+                                                label: function (contextoTooltip) {
+                                                    return contextoTooltip.dataset.label + ': ' + Number(contextoTooltip.raw).toLocaleString('pt-BR', {maximumFractionDigits: 2}) + ' h';
+                                                }
+                                            }
+                                        }
+                                    },
+                                    scales: {
+                                        y: {
+                                            beginAtZero: true,
+                                            title: {display: true, text: 'Horas'}
+                                        }
+                                    }
+                                }
+                            });
+                        });
+                    </script>
+                <?php endif; ?>
+            </section>
+
             <section class="painel">
                 <?php if ($erro !== ''): ?>
                     <div class="aviso erro" role="alert"><?= escapar($erro) ?></div>
                 <?php endif; ?>
 
-                <div class="aviso" role="note">A conexão com o GLPI usa HTTP sem criptografia. As credenciais OAuth e o token de acesso trafegam sem proteção na rede.</div>
-                <p>Chamados da categoria Clientes &gt; Offline abertos de <?= escapar($rotuloPeriodo) ?>, agrupados pelo mês de abertura. O horário final selecionado inclui o minuto inteiro. O SLA médio é o tempo corrido entre abertura e solução; chamados sem solução até o horário final selecionado não entram na média.</p>
-
                 <?php if ($erro === ''): ?>
-                    <h2 id="titulo-sla">SLA médio por mês</h2>
+                    <h2 id="titulo-sla">SLA MÉDIO POR MÊS</h2>
+                    <details>
+                        <summary class="botao secundario">Como ler esse KPI</summary>
+                        <div class="aviso" role="note">Chamados da categoria Clientes &gt; Offline abertos de <?= escapar($rotuloPeriodo) ?>, agrupados pelo mês de abertura. O horário final selecionado inclui o minuto inteiro. O SLA médio é o tempo corrido entre abertura e solução; chamados sem solução até o horário final selecionado não entram na média.</div>
+                    </details>
                     <div class="grafico">
                         <canvas id="grafico-sla" role="img" aria-label="SLA médio mensal entre abertura e solução, em horas corridas"></canvas>
                     </div>
-                    <div class="tabela-scroll max-h-[600px] overflow-y-auto">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Mês</th>
-                                    <th>Chamados abertos</th>
-                                    <th>SLA médio até solução (horas corridas)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php foreach (array_reverse($periodosRelatorio, true) as $mes => $nome): ?>
-                                    <?php $dadosMes = $relatorio[$mes]; ?>
+                    <details>
+                        <summary>Consultar os valores dos gráficos</summary>
+                        <div class="tabela-scroll max-h-[600px] overflow-y-auto">
+                            <table>
+                                <thead>
                                     <tr>
-                                        <td><?= escapar($nome) ?></td>
-                                        <td><?= (int) $dadosMes['quantidade'] ?></td>
-                                        <td><?= $dadosMes['media_horas'] === null ? '—' : escapar(number_format($dadosMes['media_horas'], 2, ',', '.')) ?></td>
+                                        <th>Mês</th>
+                                        <th>Chamados abertos</th>
+                                        <th>SLA médio até solução (horas corridas)</th>
                                     </tr>
-                                <?php endforeach; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody>
+                                    <?php foreach (array_reverse($periodosRelatorio, true) as $mes => $nome): ?>
+                                        <?php $dadosMes = $relatorio[$mes]; ?>
+                                        <tr>
+                                            <td><?= escapar($nome) ?></td>
+                                            <td><?= (int) $dadosMes['quantidade'] ?></td>
+                                            <td><?= $dadosMes['media_horas'] === null ? '—' : escapar(number_format($dadosMes['media_horas'], 2, ',', '.')) ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
                     <script>
                         document.addEventListener('DOMContentLoaded', function () {
                             const canvas = document.getElementById('grafico-sla');
@@ -673,7 +823,10 @@ require __DIR__ . '/../views/header.php';
 
                 <section aria-labelledby="titulo-mttr">
                     <h2 id="titulo-mttr">Tempo Médio de Reparo (MTTR)</h2>
-                    <p>Média de horas entre o início do atendimento pelo técnico e a baixa da ordem. O período é definido pela data e hora de conclusão; ordens sem data e hora de início do atendimento não entram no cálculo.</p>
+                    <details>
+                        <summary class="botao secundario">Como ler esse KPI</summary>
+                        <div class="aviso" role="note">Média de horas entre o início do atendimento pelo técnico e a baixa da ordem. O período é definido pela data e hora de conclusão; ordens sem data e hora de início do atendimento não entram no cálculo.</div>
+                    </details>
 
                     <?php if ($erro === ''): ?>
                         <?php if ($erroReparo !== ''): ?>
@@ -682,46 +835,40 @@ require __DIR__ . '/../views/header.php';
                         <div class="grafico">
                             <canvas id="grafico-mttr" role="img" aria-label="Tempo médio de reparo por período, em horas"></canvas>
                         </div>
-                        <?php if ($reparosSemInicio > 0): ?>
-                            <div class="aviso" role="note"><?= (int) $reparosSemInicio ?> ordem(ns) concluída(s) não possuem horário de início do atendimento e foram excluídas do cálculo.</div>
-                        <?php endif; ?>
-                        <?php if ($reparosInvalidos > 0): ?>
-                            <div class="aviso erro" role="alert"><?= (int) $reparosInvalidos ?> ordem(ns) têm baixa anterior ao início do atendimento e foram excluídas do MTTR. Verifique os horários no GLPI.</div>
-                        <?php endif; ?>
-                        <?php if ($reparosZero > 0): ?>
-                            <div class="aviso" role="note"><?= (int) $reparosZero ?> ordem(ns) com MTTR exibido como 0,00 h foram excluídas do cálculo.</div>
-                        <?php endif; ?>
 
-                        <div class="tabela-scroll max-h-[600px] overflow-y-auto">
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th>ID</th>
-                                        <th>Cliente</th>
-                                        <th>Assunto</th>
-                                        <th>Hora inicial</th>
-                                        <th>Hora final</th>
-                                        <th>Tempo (horas)</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <?php if ($ordensReparo === []): ?>
-                                        <tr><td colspan="6">Nenhuma ordem concluída com horário de atendimento no período.</td></tr>
-                                    <?php else: ?>
-                                        <?php foreach ($ordensReparo as $ordem): ?>
-                                            <tr>
-                                                <td><?= escapar($ordem['id']) ?></td>
-                                                <td><?= escapar($ordem['cliente'] !== '' ? $ordem['cliente'] : '—') ?></td>
-                                                <td><?= escapar($ordem['assunto'] !== '' ? $ordem['assunto'] : '—') ?></td>
-                                                <td><?= escapar($ordem['inicio']) ?></td>
-                                                <td><?= escapar($ordem['fim']) ?></td>
-                                                <td><?= escapar(number_format($ordem['horas'], 2, ',', '.')) ?></td>
-                                            </tr>
-                                        <?php endforeach; ?>
-                                    <?php endif; ?>
-                                </tbody>
-                            </table>
-                        </div>
+                        <details>
+                            <summary>Consultar os valores dos gráficos</summary>
+                            <div class="tabela-scroll max-h-[600px] overflow-y-auto">
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>Cliente</th>
+                                            <th>Assunto</th>
+                                            <th>Hora inicial</th>
+                                            <th>Hora final</th>
+                                            <th>Tempo (horas)</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php if ($ordensReparo === []): ?>
+                                            <tr><td colspan="6">Nenhuma ordem concluída com horário de atendimento no período.</td></tr>
+                                        <?php else: ?>
+                                            <?php foreach ($ordensReparo as $ordem): ?>
+                                                <tr>
+                                                    <td><?= escapar($ordem['id']) ?></td>
+                                                    <td><?= escapar($ordem['cliente'] !== '' ? $ordem['cliente'] : '—') ?></td>
+                                                    <td><?= escapar($ordem['assunto'] !== '' ? $ordem['assunto'] : '—') ?></td>
+                                                    <td><?= escapar($ordem['inicio']) ?></td>
+                                                    <td><?= escapar($ordem['fim']) ?></td>
+                                                    <td><?= escapar(number_format($ordem['horas'], 2, ',', '.')) ?></td>
+                                                </tr>
+                                            <?php endforeach; ?>
+                                        <?php endif; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </details>
                         <script>
                             document.addEventListener('DOMContentLoaded', function () {
                                 const canvas = document.getElementById('grafico-mttr');
@@ -731,8 +878,8 @@ require __DIR__ . '/../views/header.php';
                                 }
                                 const contexto = canvas.getContext('2d');
                                 const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
-                                degrade.addColorStop(0, 'rgba(37, 99, 235, 0.38)');
-                                degrade.addColorStop(1, 'rgba(37, 99, 235, 0.02)');
+                                degrade.addColorStop(0, 'rgba(249, 115, 22, 0.38)');
+                                degrade.addColorStop(1, 'rgba(249, 115, 22, 0.02)');
                                 const dados = <?= json_encode($dadosGraficoReparo, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?>;
                                 new Chart(canvas, {
                                     type: 'line',
@@ -741,7 +888,7 @@ require __DIR__ . '/../views/header.php';
                                         datasets: [{
                                             label: 'Tempo médio de reparo',
                                             data: dados.medias,
-                                            borderColor: '#2563eb',
+                                            borderColor: '#f97316',
                                             backgroundColor: degrade,
                                             fill: true,
                                             tension: 0.35,
@@ -780,54 +927,50 @@ require __DIR__ . '/../views/header.php';
                 </section>
             </section>
             <section class="painel" aria-labelledby="titulo-mtfr">
-                <h2 id="titulo-mtfr">Tempo médio de início de tratativa (MTFR)</h2>
-                <p>Tempo corrido entre a abertura do chamado e o primeiro atendimento técnico, calculado em horas e frações. O período é definido pela data e hora de abertura.</p>
+                <h2 id="titulo-mtfr">Tempo Médio de Início de Tratativa (MTFR)</h2>
+                <details>
+                    <summary class="botao secundario">Como ler esse KPI</summary>
+                    <div class="aviso" role="note">Tempo corrido entre a abertura ajustada para o próximo horário comercial e o primeiro atendimento técnico, calculado em horas e frações. O período e o agrupamento são definidos pela data e hora originais de abertura.</div>
+                </details>
 
                 <?php if ($erro !== ''): ?>
                     <div class="aviso" role="note">Não foi possível carregar os dados de MTFR porque a consulta principal do GLPI falhou.</div>
                 <?php else: ?>
-                    <?php if ($tratativasSemInicioMtfr > 0): ?>
-                        <div class="aviso" role="note"><?= (int) $tratativasSemInicioMtfr ?> chamado(s) não possuem data e hora de primeiro atendimento e foram excluídos do cálculo.</div>
-                    <?php endif; ?>
-                    <?php if ($tratativasInvalidasMtfr > 0): ?>
-                        <div class="aviso erro" role="alert"><?= (int) $tratativasInvalidasMtfr ?> chamado(s) têm o primeiro atendimento registrado antes da abertura e foram excluídos do MTFR. Verifique os horários no GLPI.</div>
-                    <?php endif; ?>
-                    <?php if ($tratativasZeroMtfr > 0): ?>
-                        <div class="aviso" role="note"><?= (int) $tratativasZeroMtfr ?> chamado(s) com MTFR exibido como 0,00 h foram excluídos do cálculo.</div>
-                    <?php endif; ?>
-
                     <div class="grafico">
                         <canvas id="grafico-mtfr" role="img" aria-label="Tempo médio entre abertura e primeiro atendimento técnico por mês, em horas"></canvas>
                     </div>
 
-                    <div class="tabela-scroll max-h-[600px] overflow-y-auto">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>ID</th>
-                                    <th>Assunto</th>
-                                    <th>Abertura</th>
-                                    <th>Primeiro atendimento</th>
-                                    <th>MTFR (horas)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <?php if ($chamadosMtfr === []): ?>
-                                    <tr><td colspan="5">Nenhum chamado com data de primeiro atendimento no período.</td></tr>
-                                <?php else: ?>
-                                    <?php foreach ($chamadosMtfr as $chamado): ?>
-                                        <tr>
-                                            <td><?= escapar($chamado['id']) ?></td>
-                                            <td><?= escapar($chamado['assunto'] !== '' ? $chamado['assunto'] : '—') ?></td>
-                                            <td><?= escapar($chamado['abertura']) ?></td>
-                                            <td><?= escapar($chamado['primeiro_atendimento']) ?></td>
-                                            <td><?= escapar(number_format($chamado['horas'], 2, ',', '.')) ?></td>
-                                        </tr>
-                                    <?php endforeach; ?>
-                                <?php endif; ?>
-                            </tbody>
-                        </table>
-                    </div>
+                    <details>
+                        <summary>Consultar os valores dos gráficos</summary>
+                        <div class="tabela-scroll max-h-[600px] overflow-y-auto">
+                            <table>
+                                <thead>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Assunto</th>
+                                        <th>Abertura considerada</th>
+                                        <th>Primeiro atendimento</th>
+                                        <th>MTFR (horas)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php if ($chamadosMtfr === []): ?>
+                                        <tr><td colspan="5">Nenhum chamado com data de primeiro atendimento no período.</td></tr>
+                                    <?php else: ?>
+                                        <?php foreach ($chamadosMtfr as $chamado): ?>
+                                            <tr>
+                                                <td><?= escapar($chamado['id']) ?></td>
+                                                <td><?= escapar($chamado['assunto'] !== '' ? $chamado['assunto'] : '—') ?></td>
+                                                <td><?= escapar($chamado['abertura']) ?></td>
+                                                <td><?= escapar($chamado['primeiro_atendimento']) ?></td>
+                                                <td><?= escapar(number_format($chamado['horas'], 2, ',', '.')) ?></td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    <?php endif; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </details>
                     <script>
                         document.addEventListener('DOMContentLoaded', function () {
                             const canvas = document.getElementById('grafico-mtfr');
@@ -837,8 +980,8 @@ require __DIR__ . '/../views/header.php';
                             }
                             const contexto = canvas.getContext('2d');
                             const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
-                            degrade.addColorStop(0, 'rgba(37, 99, 235, 0.38)');
-                            degrade.addColorStop(1, 'rgba(37, 99, 235, 0.02)');
+                            degrade.addColorStop(0, 'rgba(52, 168, 83, 0.38)');
+                            degrade.addColorStop(1, 'rgba(52, 168, 83, 0.02)');
                             const dados = <?= json_encode($dadosGraficoMtfr, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT | JSON_THROW_ON_ERROR) ?>;
                             new Chart(canvas, {
                                 type: 'line',
@@ -847,7 +990,7 @@ require __DIR__ . '/../views/header.php';
                                     datasets: [{
                                         label: 'Tempo médio de início de tratativa',
                                         data: dados.medias,
-                                        borderColor: '#2563eb',
+                                        borderColor: '#34A853',
                                         backgroundColor: degrade,
                                         fill: true,
                                         tension: 0.35,
@@ -882,5 +1025,68 @@ require __DIR__ . '/../views/header.php';
                         });
                     </script>
                 <?php endif; ?>
+            </section>
+            <section class="painel" aria-label="Quantidades de registros incluídos e excluídos">
+                <div class="acoes">
+                    <button
+                        type="button"
+                        id="mostrar-quantidades-registros"
+                        class="botao secundario"
+                        aria-expanded="false"
+                        aria-controls="quantidades-registros"
+                    >Mostrar quantidades de registros selecionados</button>
+                    <button
+                        type="button"
+                        id="mostrar-registros-excluidos"
+                        class="botao secundario"
+                        aria-expanded="false"
+                        aria-controls="registros-excluidos"
+                    >Mostrar registros excluídos</button>
+                </div>
+                <div id="quantidades-registros" class="aviso" role="status" hidden>
+                    <p>Registros incluídos nos cálculos do período selecionado:</p>
+                    <ul>
+                        <li>SLA: <?= (int) $quantidadeSlaSelecionada ?> registro(s)</li>
+                        <li>MTFR: <?= (int) $quantidadeMtfrSelecionada ?> registro(s)</li>
+                        <li>MTTR: <?= (int) $quantidadeMttrSelecionada ?> registro(s)</li>
+                    </ul>
+                </div>
+                <div id="registros-excluidos" class="aviso" role="status" hidden>
+                    <p>Registros excluídos dos cálculos:</p>
+                    <ul>
+                        <?php if ($slasAbaixoLimite > 0): ?>
+                            <li><?= (int) $slasAbaixoLimite ?> registro(s) de SLA abaixo de <?= escapar(number_format($LimiteParaMostrar, 2, ',', '.')) ?> h foram excluídos do gráfico e da média.</li>
+                        <?php endif; ?>
+                        <?php if ($reparosSemInicio > 0): ?>
+                            <li><?= (int) $reparosSemInicio ?> ordem(ns) concluída(s) não possuem horário de início do atendimento e foram excluídas do cálculo.</li>
+                        <?php endif; ?>
+                        <?php if ($reparosInvalidos > 0): ?>
+                            <li><?= (int) $reparosInvalidos ?> ordem(ns) têm baixa anterior ao início do atendimento e foram excluídas do MTTR. Verifique os horários no GLPI.</li>
+                        <?php endif; ?>
+                        <?php if ($reparosAbaixoLimite > 0): ?>
+                            <li><?= (int) $reparosAbaixoLimite ?> ordem(ns) com MTTR abaixo de <?= escapar(number_format($LimiteParaMostrar, 2, ',', '.')) ?> h foram excluídas do gráfico, da média e da tabela.</li>
+                        <?php endif; ?>
+                        <?php if ($tratativasSemInicioMtfr > 0): ?>
+                            <li><?= (int) $tratativasSemInicioMtfr ?> chamado(s) não possuem data e hora de primeiro atendimento e foram excluídos do cálculo.</li>
+                        <?php endif; ?>
+                        <?php if ($tratativasInvalidasMtfr > 0): ?>
+                            <li><?= (int) $tratativasInvalidasMtfr ?> chamado(s) têm o primeiro atendimento registrado antes da abertura e foram excluídos do MTFR. Verifique os horários no GLPI.</li>
+                        <?php endif; ?>
+                        <?php if ($tratativasAbaixoLimiteMtfr > 0): ?>
+                            <li><?= (int) $tratativasAbaixoLimiteMtfr ?> chamado(s) com MTFR abaixo de <?= escapar(number_format($LimiteParaMostrar, 2, ',', '.')) ?> h foram excluídos do gráfico, da média e da tabela.</li>
+                        <?php endif; ?>
+                        <?php if (
+                            $slasAbaixoLimite === 0
+                            && $reparosSemInicio === 0
+                            && $reparosInvalidos === 0
+                            && $reparosAbaixoLimite === 0
+                            && $tratativasSemInicioMtfr === 0
+                            && $tratativasInvalidasMtfr === 0
+                            && $tratativasAbaixoLimiteMtfr === 0
+                        ): ?>
+                            <li>Nenhum registro foi excluído do cálculo.</li>
+                        <?php endif; ?>
+                    </ul>
+                </div>
             </section>
 <?php require __DIR__ . '/../views/footer.php'; ?>

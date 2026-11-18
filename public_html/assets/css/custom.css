@@ -458,3 +458,48 @@ summary {
         padding: 18px;
     }
 }
+
+.loading-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(15, 23, 42, 0.72);
+    color: white;
+}
+
+.loading-overlay-conteudo {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 16px;
+    padding: 28px;
+    border-radius: 10px;
+    background: #17394d;
+    font-size: 16px;
+    font-weight: bold;
+    text-align: center;
+}
+
+.loading-overlay-spinner {
+    width: 48px;
+    height: 48px;
+    border: 5px solid rgba(255, 255, 255, 0.35);
+    border-top-color: #42d4a2;
+    border-radius: 50%;
+    animation: girar-loading 0.8s linear infinite;
+}
+
+@keyframes girar-loading {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .loading-overlay-spinner {
+        animation-duration: 1.8s;
+    }
+}

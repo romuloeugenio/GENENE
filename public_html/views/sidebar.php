@@ -9,8 +9,9 @@ if (!isset($titulo)) {
         <aside class="menu" id="menu">
             <nav aria-label="Menu principal">
                 <a href="<?= escapar(endereco('views/dashdark.php')) ?>">DashDark</a>
-                <a href="<?= escapar(endereco('views/zabbix_ticket.php')) ?>">Problemas Zabbix</a>
                 <a href="<?= escapar(endereco('views/dashboard.php')) ?>">Dashboard</a>
+                <a href="<?= escapar(endereco('views/glpi_relatorio.php')) ?>">Dashboard GLPI</a>
+                <a href="<?= escapar(endereco('views/zabbix_ticket.php')) ?>">Dash Zabbix</a>
 
                 <?php if (podeEditar() && podeExcluir()): ?>
                     <a href="<?= escapar(endereco('views/usuarios/index_usuarios.php')) ?>">Usuários</a>

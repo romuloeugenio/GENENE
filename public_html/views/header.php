@@ -15,7 +15,7 @@ if (!isset($titulo)) {
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <link rel="stylesheet" href="<?= escapar(endereco('assets/css/custom.css')) ?>?v=<?= (int) filemtime(__DIR__ . '/../assets/css/custom.css') ?>">
 
-        <?php if ($titulo === 'Dashboard'): ?>
+        <?php if (in_array($titulo, ['Dashboard', 'Relatório GLPI'], true)): ?>
             <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
         <?php endif; ?>
 

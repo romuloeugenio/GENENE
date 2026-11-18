@@ -29,6 +29,23 @@ function iniciarPagina() {
         formulario.addEventListener('submit', confirmarExclusao);
     }
 
+    const formularioPeriodoGlpi = document.querySelector('.filtro-periodo');
+    if (formularioPeriodoGlpi) {
+        formularioPeriodoGlpi.addEventListener('submit', mostrarOverlayGlpi);
+    }
+
+    const botaoQuantidadesRegistros = document.getElementById('mostrar-quantidades-registros');
+    if (botaoQuantidadesRegistros) {
+        botaoQuantidadesRegistros.addEventListener('click', alternarQuantidadesRegistros);
+    }
+
+    const botaoRegistrosExcluidos = document.getElementById('mostrar-registros-excluidos');
+    if (botaoRegistrosExcluidos) {
+        botaoRegistrosExcluidos.addEventListener('click', alternarRegistrosExcluidos);
+    }
+
+    window.addEventListener('pageshow', ocultarOverlayGlpi);
+
     const links = document.querySelectorAll('#menu a');
 
     for (const link of links) {
@@ -36,9 +53,122 @@ function iniciarPagina() {
             link.classList.add('ativo');
             link.setAttribute('aria-current', 'page');
         }
+
+        if (link.pathname.endsWith('/views/glpi_relatorio.php')) {
+            link.addEventListener('click', navegarParaRelatorioGlpi);
+        }
     }
 
     carregarGraficos();
+}
+
+/**
+ * Mostra um overlay enquanto o relatório GLPI é carregado.
+ * @returns {void} Cria o overlay quando necessário e marca a página como ocupada.
+ */
+function mostrarOverlayGlpi() {
+    let overlay = document.getElementById('glpi-loading-overlay');
+
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'glpi-loading-overlay';
+        overlay.className = 'loading-overlay';
+        overlay.setAttribute('role', 'status');
+        overlay.setAttribute('aria-live', 'polite');
+
+        const conteudo = document.createElement('div');
+        conteudo.className = 'loading-overlay-conteudo';
+
+        const spinner = document.createElement('span');
+        spinner.className = 'loading-overlay-spinner';
+        spinner.setAttribute('aria-hidden', 'true');
+
+        const mensagem = document.createElement('span');
+        mensagem.textContent = 'Carregando relatório GLPI...';
+
+        conteudo.appendChild(spinner);
+        conteudo.appendChild(mensagem);
+        overlay.appendChild(conteudo);
+        document.body.appendChild(overlay);
+    }
+
+    overlay.hidden = false;
+    document.body.setAttribute('aria-busy', 'true');
+}
+
+/**
+ * Oculta o overlay GLPI após a página terminar de carregar ou voltar do histórico.
+ * @returns {void} Oculta o indicador e libera a página para interação.
+ */
+function ocultarOverlayGlpi() {
+    const overlay = document.getElementById('glpi-loading-overlay');
+
+    if (overlay) {
+        overlay.hidden = true;
+        document.body.removeAttribute('aria-busy');
+    }
+}
+
+/**
+ * Exibe o overlay antes de navegar ao relatório GLPI pelo menu.
+ * @param {MouseEvent} evento Clique no link do relatório GLPI.
+ * @returns {void} Mostra o indicador e navega após ele poder ser renderizado.
+ */
+function navegarParaRelatorioGlpi(evento) {
+    const link = evento.currentTarget;
+
+    if (
+        evento.defaultPrevented
+        || evento.button !== 0
+        || evento.metaKey
+        || evento.ctrlKey
+        || evento.shiftKey
+        || evento.altKey
+        || link.target === '_blank'
+        || link.pathname === window.location.pathname
+    ) {
+        return;
+    }
+
+    evento.preventDefault();
+    mostrarOverlayGlpi();
+    window.requestAnimationFrame(() => {
+        window.setTimeout(() => window.location.assign(link.href), 80);
+    });
+}
+
+/**
+ * Alterna a exibição das quantidades de registros selecionados para cada KPI.
+ * @param {MouseEvent} evento Clique no botão de quantidades.
+ * @returns {void} Atualiza o painel e o estado acessível do botão.
+ */
+function alternarQuantidadesRegistros(evento) {
+    const botao = evento.currentTarget;
+    const painel = document.getElementById('quantidades-registros');
+    const mostrar = painel.hidden;
+
+    painel.hidden = !mostrar;
+    botao.setAttribute('aria-expanded', String(mostrar));
+    botao.textContent = mostrar
+        ? 'Ocultar quantidades de registros selecionados'
+        : 'Mostrar quantidades de registros selecionados';
+}
+
+/**
+ * Alterna a exibição dos registros excluídos dos cálculos.
+ * @param {MouseEvent} evento Clique no botão de registros excluídos.
+ * @returns {void} Atualiza o painel e o estado acessível do botão.
+ */
+function alternarRegistrosExcluidos(evento) {
+    const botao = evento.currentTarget;
+    const painel = document.getElementById('registros-excluidos');
+    const mostrar = painel.hidden;
+
+    painel.hidden = !mostrar;
+    botao.setAttribute('aria-expanded', String(mostrar));
+    botao.textContent = mostrar
+        ? 'Ocultar registros excluídos'
+        : 'Mostrar registros excluídos';
 }
 
 /**
