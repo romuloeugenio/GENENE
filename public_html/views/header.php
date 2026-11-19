@@ -15,7 +15,33 @@ if (!isset($titulo)) {
         <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
         <link rel="stylesheet" href="<?= escapar(endereco('assets/css/custom.css')) ?>?v=<?= (int) filemtime(__DIR__ . '/../assets/css/custom.css') ?>">
 
-        <?php if (in_array($titulo, ['Dashboard', 'Relatório GLPI'], true)): ?>
+        <?php if (!empty($carregarBibliotecaGraficos)): ?>
+            <script>
+                window.glpiChartReady = new Promise(function (resolve, reject) {
+                    const sources = [
+                        'https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js',
+                        'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js'
+                    ];
+                    let sourceIndex = 0;
+                    const loadNextSource = function () {
+                        if (typeof window.Chart !== 'undefined') {
+                            resolve(window.Chart);
+                            return;
+                        }
+                        if (sourceIndex >= sources.length) {
+                            reject(new Error('Não foi possível carregar o Chart.js pelos CDNs configurados.'));
+                            return;
+                        }
+                        const script = document.createElement('script');
+                        script.src = sources[sourceIndex++];
+                        script.onload = loadNextSource;
+                        script.onerror = loadNextSource;
+                        document.head.appendChild(script);
+                    };
+                    loadNextSource();
+                });
+            </script>
+        <?php elseif ($titulo === 'Dashboard'): ?>
             <script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1/dist/chart.umd.min.js"></script>
         <?php endif; ?>
 

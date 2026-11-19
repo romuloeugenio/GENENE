@@ -52,6 +52,7 @@ const window = {
 function Chart(canvas, configuracao) {
     this.data = configuracao.data;
     this.options = configuracao.options;
+    this.type = configuracao.type;
     this.atualizacoes = 0;
     this.update = atualizarGraficoTeste;
     graficosTeste.push(this);
@@ -87,6 +88,25 @@ function executarTestesDashDark() {
         resultados.push(descricao);
     }
 
+    document.body = {
+        classList: {
+            classes: new Set(),
+            contains(nome) { return this.classes.has(nome); }
+        }
+    };
+    conferirDark(!temaClaroDashDark() && corLegendaDashDark() === '#cbd5e1', 'DashDark mantém paleta de texto escura');
+    conferirDark(
+        corGradeVerticalDashDark() === 'rgba(148, 163, 184, 0.07)',
+        'DashDark mantém a cor original das linhas de grade'
+    );
+    document.body.classList.classes.add('tema-dashboard');
+    conferirDark(temaClaroDashDark() && corLegendaDashDark() === '#607080', 'Dash Select usa texto de gráfico legível no tema claro');
+    conferirDark(
+        corGradeVerticalDashDark() === 'rgba(100, 116, 139, 0.18)',
+        'Dash Select usa linhas de grade mais escuras no eixo vertical'
+    );
+    document.body.classList.classes.clear();
+
     conferirDark(diasDark('2024-01-01', '2024-12-31') === 366, 'Contagem inclusiva em ano bissexto');
     conferirDark(calcularInicioDark('2024-12-31', 900, '2024-01-02') === '2024-01-02', 'Ampliação limitada a 365 dias');
     conferirDark(calcularInicioDark('2024-12-31', 0, '2024-01-02') === '2024-12-31', 'Redução limitada a um dia');
@@ -97,7 +117,20 @@ function executarTestesDashDark() {
     const serie = [];
     for (let indice = 0; indice < 365; indice++) {
         const data = new Date(Date.parse('2025-01-01T00:00:00Z') + indice * 86400000).toISOString().slice(0, 10);
-        serie.push({ data: data, energia: 10, horas: 2, despesas: 3, diarias: 1, materiais: 3, servicos: 4, mat_servico: 5 });
+        serie.push({
+            data: data,
+            energia: 10,
+            horas: 2,
+            despesas: 3,
+            diarias: 1,
+            materiais: 3,
+            servicos: 4,
+            mat_servico: 5,
+            despesasCategorias: [
+                { id: 1, nome: 'Manutenção', valor: 1 },
+                { id: 2, nome: 'Materiais', valor: 2 }
+            ]
+        });
     }
 
     const estimativas = { '2025-01': 120, '2025-06': 150, '2025-12': 180 };
@@ -132,7 +165,7 @@ function executarTestesDashDark() {
         ]
     });
     iniciarDark();
-    conferirDark(graficosTeste.length === 6, 'Seis gráficos inicializados');
+    conferirDark(graficosTeste.length === 7, 'Sete gráficos inicializados, incluindo a distribuição de despesas');
     conferirDark(
         document.getElementById('inicio').value === '02/12/2025'
         && document.getElementById('fim').value === '31/12/2025',
@@ -174,24 +207,65 @@ function executarTestesDashDark() {
         selecionarPeriodoDark({ currentTarget: { dataset: { dias: String(dias) } } });
         conferirDark(diasDark(inicioDark, dadosDark.fim) === dias, 'Botão aplica período de ' + dias + ' dias');
         const agrupado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim);
-        conferirDark(graficosTeste.filter((grafico, indice) => indice !== 1).every(grafico => grafico.data.labels.length === agrupado.rotulos.length), 'Cinco gráficos do período sincronizados em ' + dias + ' dias');
+        conferirDark(graficosTeste.filter((grafico, indice) => indice !== 1 && indice !== 6).every(grafico => grafico.data.labels.length === agrupado.rotulos.length), 'Gráficos temporais sincronizados em ' + dias + ' dias');
     }
 
     conferirDark(graficosTeste[0].data.datasets[0].data.reduce((a, b) => a + b, 0) === 3650, 'Botão 1A recupera dados fora do filtro inicial');
     conferirDark(graficosTeste[5].data.datasets[0].data.reduce((a, b) => a + b, 0) === 120, 'Produção de todas as usinas soma os meses do ano');
+    const distribuicao = graficosTeste[6];
+    conferirDark(distribuicao.type === 'doughnut', 'Distribuição de despesas usa gráfico de rosca');
+    conferirDark(distribuicao.options.radius === '90%', 'DashDark reduz o raio do gráfico de rosca em 10%');
+    conferirDark(distribuicao.data.labels.join(',') === 'Manutenção,Materiais', 'Distribuição apresenta todas as categorias do período');
+    conferirDark(distribuicao.data.datasets[0].data[0] === 365 && distribuicao.data.datasets[0].data[1] === 730, 'Distribuição soma os valores de cada categoria no ano');
+    conferirDark(distribuicao.options.plugins.legend.position === 'right', 'Legenda de categorias fica ao lado do gráfico');
+    conferirDark(document.getElementById('total-categorias-despesas').textContent === '1.095,00', 'Card apresenta o total de despesas do período');
+    conferirDark(document.getElementById('valores-categorias-despesas').children.length === 2, 'Resumo inferior apresenta o valor de cada categoria');
+    conferirDark(document.getElementById('valores-categorias-despesas').children[0].children[1].textContent === 'R$ 365,00', 'Resumo inferior formata o valor da categoria');
+    conferirDark(document.getElementById('valores-categorias-despesas').children[0].children[1].className.includes('text-slate-200'), 'Resumo do DashDark usa texto claro no tema escuro');
+    document.body.classList.classes.add('tema-dashboard');
+    conferirDark(
+        configuracaoDistribuicaoDespesasDark(agruparDark(dadosDark.serie, inicioDark, dadosDark.fim)).options.radius === '90%',
+        'Dash Select reduz o raio do gráfico de rosca em 10%'
+    );
+    document.body.classList.classes.clear();
     conferirDark(document.getElementById('tabela-producao').children.length === 2, 'Tabela acompanha o botão 1A');
     conferirDark(window.location.href.includes('inicio=2025-01-01'), 'URL preserva o intervalo visível');
     selecionarPeriodoDark({ currentTarget: { dataset: { dias: '30' } } });
     conferirDark(document.getElementById('tabela-producao').children.length === 1, 'Tabela acompanha a redução para 30D');
+    conferirDark(distribuicao.data.datasets[0].data[0] === 30 && distribuicao.data.datasets[0].data[1] === 60, 'Distribuição acompanha a mudança de período');
+    conferirDark(document.getElementById('total-categorias-despesas').textContent === '90,00', 'Card total acompanha a mudança de período');
+    conferirDark(document.getElementById('valores-categorias-despesas').children[0].children[1].textContent === 'R$ 30,00', 'Valores por categoria acompanham a mudança de período');
     const misto = graficosTeste[2];
     conferirDark(misto.data.datasets.length === 5, 'Comparativo possui cinco séries');
     conferirDark(misto.data.datasets[0].type === 'bar' && misto.data.datasets.slice(1).every(serie => serie.type === 'line'), 'Diárias em barras e despesas operacionais em linhas');
+    conferirDark(misto.data.datasets[1].fill === false, 'DashDark mantém a série de horas extras sem área');
     conferirDark(misto.data.datasets[0].data.reduce((a, b) => a + b, 0) === 30, 'Barras incluem somente diárias no período de 30 dias');
     conferirDark(misto.data.datasets[1].data.reduce((a, b) => a + b, 0) === 60, 'Horas extras respeitam o período de 30 dias');
     conferirDark(misto.data.datasets.slice(1).every(serie => serie.yAxisID === 'horas'), 'Todas as linhas operacionais usam o eixo direito');
     conferirDark(misto.data.datasets[2].label === 'MATERIAIS (R$)' && misto.data.datasets[3].label === 'SERVIÇOS (R$)' && misto.data.datasets[4].label === 'MAT/SERVIÇO (R$)', 'Categorias 4, 5 e 6 aparecem como linhas');
     conferirDark(misto.options.scales.diarias.position === 'left' && misto.options.scales.horas.position === 'right', 'Dois eixos verticais independentes');
     conferirDark(misto.data.datasets[0].yAxisID === 'diarias' && misto.data.datasets[1].yAxisID === 'horas', 'Cada série usa seu próprio eixo');
+    document.body.classList.classes.add('tema-dashboard');
+    const comparativoClaro = configuracaoDark('comparativo', agruparDark(serie, inicioDark, dadosDark.fim));
+    const horasExtrasClaras = comparativoClaro.data.datasets[1];
+    const paradasGradiente = [];
+    const gradienteArea = {
+        addColorStop(posicao, cor) { paradasGradiente.push([posicao, cor]); }
+    };
+    const fundoHorasExtras = horasExtrasClaras.backgroundColor({
+        chart: {
+            chartArea: { bottom: 300, top: 20 },
+            ctx: {
+                createLinearGradient(xInicial, yInicial, xFinal, yFinal) {
+                    conferirDark(xInicial === 0 && yInicial === 300 && xFinal === 0 && yFinal === 20, 'Degradê cobre a área sob a série de horas extras');
+                    return gradienteArea;
+                }
+            }
+        }
+    });
+    document.body.classList.classes.clear();
+    conferirDark(horasExtrasClaras.fill === true && horasExtrasClaras.borderColor === '#0284C7', 'Dash Select exibe horas extras como área azul');
+    conferirDark(fundoHorasExtras === gradienteArea && paradasGradiente.length === 2, 'Área de horas extras recebe preenchimento em degradê');
     const acumulado = graficosTeste[3];
     conferirDark(acumulado.data.datasets.length === 5 && acumulado.data.datasets.every(serie => serie.type === 'line'), 'Acumulado possui cinco séries em linhas');
     conferirDark(acumulado.data.datasets[0].data.at(-1) === 30, 'Diárias acumulam o total no fim do período');

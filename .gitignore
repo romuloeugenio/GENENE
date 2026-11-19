@@ -5,6 +5,10 @@
 .env
 .env.*
 !.env.example
+/glpi.credentials.php
+/auvo.credentials.php
+/auvo.tokens.json
+/zabbix.credentials.php
 /zabbix.json
 *.pem
 *.key

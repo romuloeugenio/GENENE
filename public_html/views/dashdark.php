@@ -62,6 +62,8 @@ $energia = [];
 $horas = [];
 $diarias = [];
 $despesas = [];
+$despesasPorCategoria = [];
+$despesasCategoriasResumo = [];
 $registrosProducao = [];
 $producaoEstimada = [];
 
@@ -139,6 +141,31 @@ if ($usinaSelecionada) {
     $despesas = $consulta->fetchAll(PDO::FETCH_KEY_PAIR);
 
     $consulta = $pdo->prepare(
+        'SELECT d.data, c.id_categoria, c.descricao_categoria, SUM(d.valor_despesa) AS total
+         FROM despesas d
+         INNER JOIN categoria c ON c.id_categoria = d.categoria
+         WHERE d.usina_id = ? AND d.data BETWEEN ? AND ?
+         GROUP BY d.data, c.id_categoria, c.descricao_categoria
+         ORDER BY d.data, c.descricao_categoria'
+    );
+    $consulta->execute($parametros);
+    foreach ($consulta->fetchAll() as $despesaCategoria) {
+        $despesasPorCategoria[$despesaCategoria['data']][] = [
+            'id' => (int) $despesaCategoria['id_categoria'],
+            'nome' => $despesaCategoria['descricao_categoria'],
+            'valor' => (float) $despesaCategoria['total']
+        ];
+        $idCategoria = (string) $despesaCategoria['id_categoria'];
+        if (!isset($despesasCategoriasResumo[$idCategoria])) {
+            $despesasCategoriasResumo[$idCategoria] = [
+                'nome' => $despesaCategoria['descricao_categoria'],
+                'valor' => 0
+            ];
+        }
+        $despesasCategoriasResumo[$idCategoria]['valor'] += (float) $despesaCategoria['total'];
+    }
+
+    $consulta = $pdo->prepare(
         'SELECT id, data_producao, kwh_gerado
          FROM producao_energia
          WHERE usina_id = ? AND data_producao BETWEEN ? AND ?
@@ -164,7 +191,8 @@ while ($cursor <= $dataFinal) {
         'materiais' => (float) ($valoresCategorias['materiais'][$data] ?? 0),
         'servicos' => (float) ($valoresCategorias['servicos'][$data] ?? 0),
         'mat_servico' => (float) ($valoresCategorias['mat_servico'][$data] ?? 0),
-        'despesas' => (float) ($despesas[$data] ?? 0)
+        'despesas' => (float) ($despesas[$data] ?? 0),
+        'despesasCategorias' => $despesasPorCategoria[$data] ?? []
     ];
     $serie[] = $dia;
 
@@ -209,6 +237,7 @@ $dados = [
 $diasVisiveis = (new DateTimeImmutable($inicio))->diff($dataFinal)->days + 1;
 $links = [
     ['DashDark', 'views/dashdark.php', '◈'],
+    ['Dash Select', 'views/dashselect.php', '▧'],
     ['Dashboard', 'views/dashboard.php', '▦'],
     ['Usinas', 'views/usinas/index_usinas.php', '☀'],
     ['Técnicos', 'views/tecnicos/index_tecnicos.php', '♙'],
@@ -218,7 +247,7 @@ $links = [
     ['Categorias', 'views/categoria/index_categoria.php', '▣']
 ];
 
-if (podeEditar() && podeExcluir()) {
+if (ehAdministrador() && podeEditar() && podeExcluir()) {
     $links[] = ['Usuários', 'views/usuarios/index_usuarios.php', '♙'];
 }
 
@@ -403,13 +432,38 @@ if (podeEditar() && podeExcluir()) {
                             <canvas id="grafico-acumulado" role="img" aria-label="Valores acumulados de diárias, horas extras, materiais, serviços e mat/serviço em linhas"></canvas>
                         </div>
                     </section>
-                    <section class="mb-6 rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
-                        <h2 class="font-semibold text-white">Despesas totais</h2>
-                        <p class="mt-2 text-xs text-slate-400">Todas as categorias em reais e produção de energia em área, na mesma usina e no mesmo período dos demais gráficos.</p>
-                        <div class="relative mt-5 h-80">
-                            <canvas id="grafico-despesas" role="img" aria-label="Despesas totais em reais e produção de energia em área de mWh"></canvas>
-                        </div>
-                    </section>
+                    <div class="mb-6 grid gap-6 xl:grid-cols-[60fr_40fr]">
+                        <section class="rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
+                            <h2 class="font-semibold text-white">Despesas totais</h2>
+                            <p class="mt-2 text-xs text-slate-400">Todas as categorias em reais e produção de energia em área, na mesma usina e no mesmo período dos demais gráficos.</p>
+                            <div class="relative mt-5 h-80">
+                                <canvas id="grafico-despesas" role="img" aria-label="Despesas totais em reais e produção de energia em área de mWh"></canvas>
+                            </div>
+                        </section>
+                        <section class="rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
+                            <div class="flex flex-wrap items-start justify-between gap-4">
+                                <h2 class="font-semibold text-white">Despesas por categoria no período</h2>
+                                <div class="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-2 text-right">
+                                    <p class="text-[10px] font-medium uppercase tracking-wide text-emerald-300">Total de despesas</p>
+                                    <p class="mt-1 text-lg font-semibold text-emerald-200">R$ <span id="total-categorias-despesas"><?= formatarNumero($totais['despesas']) ?></span></p>
+                                </div>
+                            </div>
+                            <p class="mt-2 text-xs text-slate-400">Distribuição de todas as despesas por categoria, em reais.</p>
+                            <div class="relative mt-5 h-80">
+                                <canvas id="grafico-categorias-despesas" role="img" aria-label="Gráfico de rosca com todas as despesas do período distribuídas por categoria"></canvas>
+                            </div>
+                            <div id="valores-categorias-despesas" class="mt-4 grid gap-2 border-t border-white/10 pt-4 sm:grid-cols-2" aria-label="Valores das despesas por categoria">
+                                <?php foreach ($despesasCategoriasResumo as $despesaCategoria): ?>
+                                    <?php if ($despesaCategoria['valor'] > 0): ?>
+                                        <div class="flex items-center justify-between gap-3 text-xs">
+                                            <span class="text-slate-400"><?= escapar($despesaCategoria['nome']) ?></span>
+                                            <span class="font-medium text-slate-200">R$ <?= formatarNumero($despesaCategoria['valor']) ?></span>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                    </div>
 
                     <details class="rounded-xl border border-white/5 bg-[#191c29] p-5 sm:p-6">
                         <summary class="cursor-pointer text-sm font-medium text-violet-300">Consultar valores da tabela de produção de energia</summary>

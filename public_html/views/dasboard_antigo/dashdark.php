@@ -165,7 +165,7 @@ $links = [
     ['Categorias', 'views/categoria/index_categoria.php', '▣']
 ];
 
-if (podeEditar() && podeExcluir()) {
+if (ehAdministrador() && podeEditar() && podeExcluir()) {
     $links[] = ['Usuários', 'views/usuarios/index_usuarios.php', '♙'];
 }
 

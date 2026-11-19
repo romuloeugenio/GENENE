@@ -140,6 +140,25 @@ try {
     $pdo->exec("CREATE DATABASE `$banco` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci");
     $pdo->exec("USE `$banco`");
     $pdo->exec(file_get_contents($raiz . '/public_html/schema.sql'));
+    $colunaNivel = $pdo->query(
+        "SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+         FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'usuarios'
+           AND COLUMN_NAME = 'Nivel_Usuario'"
+    )->fetch(PDO::FETCH_ASSOC);
+    conferir(
+        $colunaNivel['DATA_TYPE'] === 'varchar'
+        && (int) $colunaNivel['CHARACTER_MAXIMUM_LENGTH'] === 1
+        && $pdo->query('SELECT Nivel_Usuario FROM usuarios WHERE id = 1')->fetchColumn() === '1',
+        'Schema cria Nivel_Usuario como VARCHAR(1) com nível padrão 1'
+    );
+    $pdo->exec('ALTER TABLE usuarios DROP COLUMN Nivel_Usuario');
+    $pdo->exec(file_get_contents($raiz . '/migrations/20261105_usuario_nivel.sql'));
+    conferir(
+        $pdo->query('SELECT Nivel_Usuario FROM usuarios WHERE id = 1')->fetchColumn() === '1',
+        'Migração atribui nível 1 aos usuários existentes'
+    );
 
     putenv('DB_NAME=' . $banco);
     putenv('BASE_URL=/');
@@ -185,6 +204,18 @@ try {
     conferir(requisitar('index.php', ['email' => 'admin@usina.com', 'senha' => 'admin'])['status'] === 403, 'Login exige token');
 
     $token = entrar('admin@usina.com', 'admin');
+    conferir(
+        strpos(requisitar('views/dashboard.php')['corpo'], 'views/usuarios/index_usuarios.php') !== false,
+        'Nível administrador vê a opção Usuários no menu'
+    );
+    $menuAdmin = requisitar('views/dashboard.php')['corpo'];
+    conferir(strpos($menuAdmin, 'views/glpi_relatorio.php') !== false, 'Menu autenticado oferece relatório GLPI');
+    $paginaGlpi = requisitar('views/glpi_relatorio.php');
+    conferir(
+        $paginaGlpi['status'] === 200
+        && strpos($paginaGlpi['corpo'], 'Preencha api_url, app_token e user_token') !== false,
+        'Relatório GLPI informa credenciais locais ausentes sem conectar ao servidor'
+    );
     $dashboardInicial = requisitar('views/dashboard.php')['corpo'];
     conferir(strpos($dashboardInicial, 'Nenhuma usina') !== false, 'Dashboard vazio');
     conferir(strpos($dashboardInicial, 'views/producao_estimada/index_producao_estimada.php') !== false, 'Menu de Produção Estimada no dashboard');
@@ -196,7 +227,7 @@ try {
     $cadastros = [
         'usuarios' => [
             'nome' => 'Consulta', 'email' => 'consulta@example.com', 'senha' => 'SenhaTeste123',
-            'administrador' => 'S', 'pode_editar' => 'N', 'pode_excluir' => 'N'
+            'administrador' => 'S', 'Nivel_Usuario' => '1', 'pode_editar' => 'N', 'pode_excluir' => 'N'
         ],
         'usinas' => [
             'nome' => 'Usina <script>alert(1)</script>', 'tipo' => 'Fotovoltaica',
@@ -251,12 +282,58 @@ try {
         }
 
         if ($modulo === 'usuarios') {
+            $formNovoUsuario = requisitar('views/usuarios/usuarios.php');
+            conferir(
+                strpos($formNovoUsuario['corpo'], '<option value="1" selected>1 - Administrador</option>') !== false,
+                'Nível 1 selecionado por padrão em novos usuários'
+            );
             conferir($pdo->query('SELECT administrador FROM usuarios WHERE id = 2')->fetchColumn() === 'S', 'Cadastro e edição persistem administrador');
+            conferir($pdo->query('SELECT Nivel_Usuario FROM usuarios WHERE id = 2')->fetchColumn() === '1', 'Cadastro grava o nível de usuário selecionado');
+            $formUsuario = requisitar('views/usuarios/usuarios.php?id=2');
+            conferir(
+                strpos($formUsuario['corpo'], 'Nível de usuário') !== false
+                && strpos($formUsuario['corpo'], '5 - Técnico') !== false,
+                'Formulário de usuário oferece os níveis disponíveis'
+            );
             $dadosUsuario = ['token' => $token, 'administrador' => 'N'] + $cadastros['usuarios'];
             conferir(requisitar('views/usuarios/usuarios.php?id=2', $dadosUsuario)['status'] === 303, 'Atualizar campo administrador');
             conferir($pdo->query('SELECT administrador FROM usuarios WHERE id = 2')->fetchColumn() === 'N', 'Edição atualiza o valor de administrador');
+            $dadosUsuario = ['token' => $token, 'Nivel_Usuario' => '5'] + $cadastros['usuarios'];
+            conferir(requisitar('views/usuarios/usuarios.php?id=2', $dadosUsuario)['status'] === 303, 'Atualizar nível de usuário');
+            conferir($pdo->query('SELECT Nivel_Usuario FROM usuarios WHERE id = 2')->fetchColumn() === '5', 'Edição atualiza o nível de usuário');
+            $listaUsuarios = requisitar('views/usuarios/index_usuarios.php');
+            conferir(strpos($listaUsuarios['corpo'], '5 - Técnico') !== false, 'Listagem identifica o nível de usuário');
+            $token = entrar('consulta@example.com', 'SenhaTeste123');
+            foreach (['views/dashboard.php', 'views/dashdark.php', 'views/dashselect.php'] as $paginaMenu) {
+                conferir(
+                    strpos(requisitar($paginaMenu)['corpo'], 'views/usuarios/index_usuarios.php') === false,
+                    'Nível 5 não vê Usuários no menu ' . basename($paginaMenu)
+                );
+            }
+            $token = entrar('admin@usina.com', 'admin');
             $dadosUsuario = ['token' => $token, 'administrador' => 'X'] + $cadastros['usuarios'];
             conferir(requisitar('views/usuarios/usuarios.php', $dadosUsuario)['status'] === 422, 'Rejeitar valor de administrador inválido');
+            $dadosUsuario = ['token' => $token, 'Nivel_Usuario' => '4'] + $cadastros['usuarios'];
+            conferir(requisitar('views/usuarios/usuarios.php', $dadosUsuario)['status'] === 422, 'Rejeitar nível de usuário inválido');
+        }
+
+        if ($modulo === 'usinas') {
+            $respostaSelect = requisitar('views/dashselect.php?usina_id=1&inicio=2026-01-01&fim=2026-01-03');
+            $select = dadosDashDark($respostaSelect);
+            conferir($respostaSelect['status'] === 200 && $select['usinaId'] === 1, 'Dash Select carrega dados da usina selecionada');
+            conferir(
+                strpos($respostaSelect['corpo'], 'class="tema-dashboard min-h-screen bg-[#f2f5f7]') !== false
+                && strpos($respostaSelect['corpo'], '[color-scheme:light]') !== false,
+                'Dash Select usa paleta e controles claros'
+            );
+            conferir(
+                strpos($respostaSelect['corpo'], 'views/dashselect.php') !== false
+                && substr_count($respostaSelect['corpo'], '<canvas') === 7
+                && strpos($respostaSelect['corpo'], 'id="grafico-categorias-despesas"') !== false
+                && strpos($respostaSelect['corpo'], '<aside id="menu-dark"') !== false
+                && strpos($respostaSelect['corpo'], '<main class="mx-auto max-w-[1700px]') !== false,
+                'Dash Select mantém o layout do DashDark com a paleta clara'
+            );
         }
 
         if ($modulo === 'despesas') {
@@ -476,9 +553,33 @@ try {
     conferir($porData['2026-01-02']['mat_servico'] === 60, 'DashDark inclui a categoria MAT/SERVIÇO');
     conferir($porData['2026-01-02']['despesas'] === 430, 'Despesas do DashDark incluem todas as categorias operacionais');
     conferir($porData['2026-01-02']['diarias'] === 200, 'Diárias do DashDark vêm da categoria');
+    conferir(
+        (float) array_sum(array_column($porData['2026-01-02']['despesasCategorias'], 'valor')) === 430.0
+        && count($porData['2026-01-02']['despesasCategorias']) === 5,
+        'DashDark inclui valores de todas as categorias de despesas por dia'
+    );
+    conferir(
+        strpos($respostaDark['corpo'], 'id="total-categorias-despesas">430,00</span>') !== false
+        && strpos($respostaDark['corpo'], 'border-white/10 pt-4') !== false
+        && strpos($respostaDark['corpo'], 'font-medium text-slate-200') !== false,
+        'Painel de categorias do DashDark exibe total, valores e estilo escuro'
+    );
+    $selectCategorias = dadosDashDark(requisitar('views/dashselect.php?usina_id=1&inicio=2026-01-01&fim=2026-01-03'));
+    $porDataSelect = array_column($selectCategorias['serie'], null, 'data');
+    conferir(
+        (float) array_sum(array_column($porDataSelect['2026-01-02']['despesasCategorias'], 'valor')) === 430.0
+        && count($porDataSelect['2026-01-02']['despesasCategorias']) === 5,
+        'Dash Select carrega o total de todas as categorias de despesas por dia'
+    );
+    $htmlCategorias = requisitar('views/dashselect.php?usina_id=1&inicio=2026-01-01&fim=2026-01-03')['corpo'];
+    conferir(
+        strpos($htmlCategorias, 'id="total-categorias-despesas">430,00</span>') !== false
+        && strpos($htmlCategorias, '>R$ 200,00</span>') !== false,
+        'Dash Select apresenta total e valores agregados por categoria'
+    );
     conferir($porData['2026-01-01']['energia'] === 0, 'Dia sem produção no DashDark');
     conferir(count($dark['producao']) === 1, 'Tabela de produção da usina selecionada');
-    conferir(substr_count($respostaDark['corpo'], '<canvas') === 4, 'Quatro gráficos no DashDark');
+    conferir(substr_count($respostaDark['corpo'], '<canvas') === 5, 'Cinco gráficos no DashDark');
     conferir(count($dark['todasUsinas']) === 5 && $dark['todasUsinas'][0]['valores']['2026-01-02'] === 120.5, 'Comparação inclui todas as usinas e a produção correta');
     conferir(strpos($respostaDark['corpo'], '<script>alert(1)</script>') === false, 'Nome da usina escapado no DashDark');
     $darkPadrao = dadosDashDark(requisitar('views/dashdark.php'));

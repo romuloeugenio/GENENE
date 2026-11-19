@@ -28,6 +28,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $_SESSION = [
                 'usuario_id' => $usuario['id'],
                 'nome' => $usuario['nome'],
+                'Nivel_Usuario' => $usuario['Nivel_Usuario'],
                 'pode_editar' => $usuario['pode_editar'],
                 'pode_excluir' => $usuario['pode_excluir'],
                 'ultima_atividade' => time()

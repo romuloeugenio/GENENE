@@ -111,7 +111,7 @@ function exigirLogin()
     }
 
     $pdo = conectarBanco();
-    $consulta = $pdo->prepare('SELECT id, nome, pode_editar, pode_excluir FROM usuarios WHERE id = ?');
+    $consulta = $pdo->prepare('SELECT id, nome, Nivel_Usuario, pode_editar, pode_excluir FROM usuarios WHERE id = ?');
     $consulta->execute([$_SESSION['usuario_id']]);
     $usuario = $consulta->fetch();
 
@@ -122,6 +122,7 @@ function exigirLogin()
     }
 
     $_SESSION['nome'] = $usuario['nome'];
+    $_SESSION['Nivel_Usuario'] = $usuario['Nivel_Usuario'];
     $_SESSION['pode_editar'] = $usuario['pode_editar'];
     $_SESSION['pode_excluir'] = $usuario['pode_excluir'];
     $_SESSION['ultima_atividade'] = time();
@@ -145,6 +146,16 @@ function podeEditar()
 function podeExcluir()
 {
     return ($_SESSION['pode_excluir'] ?? 'N') === 'S';
+}
+
+/**
+ * Verifica se o nível do usuário autenticado é administrador.
+ * Parâmetros: nenhum. Lê Nivel_Usuario da sessão atualizada por exigirLogin().
+ * @return bool Verdadeiro quando o nível é 1.
+ */
+function ehAdministrador()
+{
+    return ($_SESSION['Nivel_Usuario'] ?? '') === '1';
 }
 
 /**

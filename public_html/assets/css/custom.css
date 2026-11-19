@@ -315,6 +315,10 @@ th {
     gap: 16px;
 }
 
+.filtro-auvo .campo-data {
+    width: 140px;
+}
+
 .grade-usinas {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

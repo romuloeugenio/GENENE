@@ -65,11 +65,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
 // Consulta dos registros que serão exibidos na tabela.
 $consulta = $pdo->query(
-    'SELECT r.id, r.nome, r.email, r.pode_editar, r.pode_excluir
+    'SELECT r.id, r.nome, r.email, r.Nivel_Usuario, r.pode_editar, r.pode_excluir
      FROM usuarios r
      ORDER BY r.id DESC'
 );
 $registros = $consulta->fetchAll();
+$niveisUsuario = [
+    '1' => '1 - Administrador',
+    '2' => '2 - Gerência',
+    '3' => '3 - Operador de usina',
+    '5' => '5 - Técnico',
+    '6' => '6 - Financeiro',
+    '7' => '7 - Suporte'
+];
 $titulo = 'Usuários';
 
 require __DIR__ . '/../header.php';
@@ -86,6 +94,7 @@ require __DIR__ . '/../header.php';
                                 <th>ID</th>
                                 <th>Nome</th>
                                 <th>E-mail</th>
+                                <th>Nível de usuário</th>
                                 <th>Pode incluir / editar</th>
                                 <th>Pode excluir</th>
                                 <th>Ações</th>
@@ -97,6 +106,7 @@ require __DIR__ . '/../header.php';
                                     <td><?= escapar($registro['id']) ?></td>
                                     <td><?= escapar($registro['nome']) ?></td>
                                     <td><?= escapar($registro['email']) ?></td>
+                                    <td><?= escapar($niveisUsuario[$registro['Nivel_Usuario']] ?? $registro['Nivel_Usuario']) ?></td>
                                     <td><?= escapar($registro['pode_editar']) ?></td>
                                     <td><?= escapar($registro['pode_excluir']) ?></td>
                                     <td>
@@ -121,7 +131,7 @@ require __DIR__ . '/../header.php';
                                 </tr>
                             <?php endforeach; ?>
                             <tr id="sem-registros" <?= count($registros) > 0 ? 'hidden' : '' ?>>
-                                <td colspan="6">Nenhum registro encontrado.</td>
+                                <td colspan="7">Nenhum registro encontrado.</td>
                             </tr>
                         </tbody>
                     </table>

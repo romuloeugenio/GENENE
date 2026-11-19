@@ -97,8 +97,10 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
         servicos: [],
         mat_servico: [],
         despesas: [],
+        distribuicaoDespesas: [],
         totais: { energia: 0, horas: 0, diarias: 0, despesas: 0 }
     };
+    const categoriasDespesas = new Map();
 
     for (const dia of serie) {
         if (dia.data < inicio || dia.data > fim) {
@@ -119,7 +121,19 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
             }
         }
 
+        for (const categoria of dia.despesasCategorias || []) {
+            const id = String(categoria.id);
+            if (!categoriasDespesas.has(id)) {
+                categoriasDespesas.set(id, { id: id, nome: categoria.nome, valor: 0 });
+            }
+            categoriasDespesas.get(id).valor += Number(categoria.valor || 0);
+        }
     }
+
+    resultado.distribuicaoDespesas = Array.from(categoriasDespesas.values())
+        .map(categoria => ({ ...categoria, valor: Math.round(categoria.valor * 100) / 100 }))
+        .filter(categoria => categoria.valor > 0)
+        .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
 
     for (const [periodo, valores] of grupos) {
         const rotulo = mensal ? periodo.slice(5, 7) + '/' + periodo.slice(0, 4) : dataTextoDark(periodo);
@@ -138,6 +152,18 @@ function agruparDark(serie, inicio, fim, estimativas = {}) {
     }
 
     return resultado;
+}
+
+function temaClaroDashDark() {
+    return Boolean(document.body && document.body.classList.contains('tema-dashboard'));
+}
+
+function corLegendaDashDark() {
+    return temaClaroDashDark() ? '#607080' : '#cbd5e1';
+}
+
+function corGradeVerticalDashDark() {
+    return temaClaroDashDark() ? 'rgba(100, 116, 139, 0.18)' : 'rgba(148, 163, 184, 0.07)';
 }
 
 /**
@@ -179,10 +205,10 @@ function configuracaoDark(chave, agrupado) {
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: '#10121b',
-                    titleColor: '#e2e8f0',
-                    bodyColor: '#cbd5e1',
-                    borderColor: '#34384b',
+                    backgroundColor: temaClaroDashDark() ? '#ffffff' : '#10121b',
+                    titleColor: temaClaroDashDark() ? '#243746' : '#e2e8f0',
+                    bodyColor: corLegendaDashDark(),
+                    borderColor: temaClaroDashDark() ? '#cbd5dd' : '#34384b',
                     borderWidth: 1,
                     padding: 12
                 }
@@ -196,7 +222,7 @@ function configuracaoDark(chave, agrupado) {
                 y: {
                     beginAtZero: true,
                     border: { display: false },
-                    grid: { color: 'rgba(148, 163, 184, 0.07)' },
+                    grid: { color: corGradeVerticalDashDark() },
                     title: { display: true, text: unidades[chave], color: '#7e879f', font: { size: 10 } },
                     ticks: { color: '#7e879f', maxTicksLimit: 5, font: { size: 10 } }
                 }
@@ -234,7 +260,7 @@ function configuracaoDark(chave, agrupado) {
         configuracao.options.plugins.legend = {
             display: true,
             position: 'bottom',
-            labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+            labels: { color: corLegendaDashDark(), usePointStyle: true, boxWidth: 8, padding: 16 }
         };
         const eixoBase = configuracao.options.scales.y;
         configuracao.options.scales.y.title.text = 'Despesas totais (R$)';
@@ -247,6 +273,7 @@ function configuracaoDark(chave, agrupado) {
     }
 
     if (chave === 'comparativo') {
+        const corHorasExtras = temaClaroDashDark() ? '#0284C7' : '#67d9e8';
         configuracao.data.datasets = [
             {
                 type: 'bar',
@@ -263,12 +290,24 @@ function configuracaoDark(chave, agrupado) {
                 label: 'Horas extras (R$)',
                 data: agrupado.horas,
                 yAxisID: 'horas',
-                borderColor: '#67d9e8',
-                backgroundColor: '#67d9e8',
+                borderColor: corHorasExtras,
+                backgroundColor: (context) => {
+                    if (!temaClaroDashDark()) {
+                        return corHorasExtras;
+                    }
+                    const { chart } = context;
+                    if (!chart.chartArea) {
+                        return 'rgba(2, 132, 199, 0.18)';
+                    }
+                    const gradiente = chart.ctx.createLinearGradient(0, chart.chartArea.bottom, 0, chart.chartArea.top);
+                    gradiente.addColorStop(0, 'rgba(2, 132, 199, 0.02)');
+                    gradiente.addColorStop(1, 'rgba(2, 132, 199, 0.28)');
+                    return gradiente;
+                },
                 borderWidth: 2,
                 tension: 0.25,
                 pointRadius: agrupado.rotulos.length < 15 ? 3 : 0,
-                fill: false,
+                fill: temaClaroDashDark(),
                 order: 1
             },
             {
@@ -314,7 +353,7 @@ function configuracaoDark(chave, agrupado) {
         configuracao.options.plugins.legend = {
             display: true,
             position: 'bottom',
-            labels: { color: '#cbd5e1', boxWidth: 12, padding: 20 }
+            labels: { color: corLegendaDashDark(), boxWidth: 12, padding: 20 }
         };
         const eixoBase = configuracao.options.scales.y;
         delete configuracao.options.scales.y;
@@ -327,7 +366,7 @@ function configuracaoDark(chave, agrupado) {
             ...eixoBase,
             position: 'right',
             grid: { drawOnChartArea: false },
-            title: { display: true, text: 'Despesas operacionais (R$)', color: '#67d9e8' }
+            title: { display: true, text: 'Despesas operacionais (R$)', color: corHorasExtras }
         };
         configuracao.options.scales.x.ticks.maxTicksLimit = 10;
     }
@@ -349,7 +388,7 @@ function configuracaoDark(chave, agrupado) {
         configuracao.options.plugins.legend = {
             display: true,
             position: 'bottom',
-            labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+            labels: { color: corLegendaDashDark(), usePointStyle: true, boxWidth: 8, padding: 16 }
         };
     }
 
@@ -473,10 +512,137 @@ function configuracaoAcumuladaDark(agrupado) {
     modelo.options.plugins.legend = {
         display: true,
         position: 'bottom',
-        labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+        labels: { color: corLegendaDashDark(), usePointStyle: true, boxWidth: 8, padding: 16 }
     };
     modelo.options.scales.x.ticks.maxTicksLimit = 10;
     return modelo;
+}
+
+/**
+ * Monta a distribuição das despesas do período por categoria.
+ * @param {Object} agrupado Resultado de agruparDark() para o período visível.
+ * @returns {Object} Configuração Chart.js do gráfico de rosca por categoria.
+ */
+function configuracaoDistribuicaoDespesasDark(agrupado) {
+    const cores = ['#4777c7', '#ff9900', '#00a651', '#ffc400', '#f44336', '#8a8a8a'];
+    const valores = agrupado.distribuicaoDespesas.map(categoria => categoria.valor);
+
+    return {
+        type: 'doughnut',
+        data: {
+            labels: agrupado.distribuicaoDespesas.map(categoria => categoria.nome),
+            datasets: [{
+                data: valores,
+                backgroundColor: valores.map((valor, indice) => cores[indice] || `hsl(${(indice * 137.5) % 360}, 70%, 55%)`),
+                borderColor: temaClaroDashDark() ? '#ffffff' : '#171923',
+                borderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            animation: false,
+            locale: 'pt-BR',
+            cutout: '45%',
+            radius: '90%',
+            plugins: {
+                legend: {
+                    display: true,
+                    position: 'right',
+                    labels: { color: corLegendaDashDark(), usePointStyle: true, boxWidth: 8, padding: 12 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label(contexto) {
+                            const valor = Number(contexto.raw || 0);
+                            const totalAtual = contexto.chart.data.datasets[0].data.reduce((soma, item) => soma + Number(item || 0), 0);
+                            const percentual = totalAtual > 0 ? valor / totalAtual * 100 : 0;
+                            return `${contexto.label}: R$ ${valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} (${percentual.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}%)`;
+                        }
+                    }
+                }
+            }
+        },
+        plugins: [{
+            id: 'rotulos-percentuais-despesas',
+            afterDatasetsDraw(grafico) {
+                const contexto = grafico.ctx;
+                const dadosAtuais = grafico.data.datasets[0].data.map(valor => Number(valor || 0));
+                const soma = dadosAtuais.reduce((acumulado, valor) => acumulado + valor, 0);
+                contexto.save();
+
+                if (soma <= 0) {
+                    const area = grafico.chartArea;
+                    contexto.fillStyle = corLegendaDashDark();
+                    contexto.font = '12px sans-serif';
+                    contexto.textAlign = 'center';
+                    contexto.textBaseline = 'middle';
+                    contexto.fillText('Sem despesas neste período', (area.left + area.right) / 2, (area.top + area.bottom) / 2);
+                    contexto.restore();
+                    return;
+                }
+
+                contexto.fillStyle = '#ffffff';
+                contexto.font = '600 11px sans-serif';
+                contexto.textAlign = 'center';
+                contexto.textBaseline = 'middle';
+
+                for (const [indice, elemento] of grafico.getDatasetMeta(0).data.entries()) {
+                    if (dadosAtuais[indice] <= 0) {
+                        continue;
+                    }
+                    const posicao = elemento.tooltipPosition();
+                    const percentual = dadosAtuais[indice] / soma * 100;
+                    contexto.fillText(`${percentual.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}%`, posicao.x, posicao.y);
+                }
+
+                contexto.restore();
+            }
+        }]
+    };
+}
+
+/**
+ * Atualiza o total e os valores por categoria do painel de despesas do Dash Select.
+ * @param {Object} agrupado Resultado de agruparDark() para o período visível.
+ * @returns {void} Atualiza somente quando o painel do Dash Select está presente.
+ */
+function atualizarResumoDespesasCategoriasDark(agrupado) {
+    const total = document.getElementById('total-categorias-despesas');
+    const lista = document.getElementById('valores-categorias-despesas');
+    if (!total || !lista) {
+        return;
+    }
+
+    total.textContent = agrupado.totais.despesas.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    lista.replaceChildren();
+    const textoClasse = temaClaroDashDark() ? 'text-[#607080]' : 'text-slate-400';
+    const valorClasse = temaClaroDashDark() ? 'font-medium text-[#243746]' : 'font-medium text-slate-200';
+
+    if (agrupado.distribuicaoDespesas.length === 0) {
+        const vazio = document.createElement('p');
+        vazio.className = 'text-xs ' + textoClasse;
+        vazio.textContent = 'Nenhuma despesa neste período.';
+        lista.appendChild(vazio);
+        return;
+    }
+
+    for (const categoria of agrupado.distribuicaoDespesas) {
+        const linha = document.createElement('div');
+        linha.className = 'flex items-center justify-between gap-3 text-xs';
+
+        const nome = document.createElement('span');
+        nome.className = textoClasse;
+        nome.textContent = categoria.nome;
+
+        const valor = document.createElement('span');
+        valor.className = valorClasse;
+        valor.textContent = 'R$ ' + categoria.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+        linha.appendChild(nome);
+        linha.appendChild(valor);
+        lista.appendChild(linha);
+    }
 }
 
 /**
@@ -555,7 +721,7 @@ function configuracaoTodasUsinasDark(agrupado) {
         display: true,
         position: 'top',
         align: 'start',
-        labels: { color: '#cbd5e1', usePointStyle: true, boxWidth: 8, padding: 16 }
+        labels: { color: corLegendaDashDark(), usePointStyle: true, boxWidth: 8, padding: 16 }
     };
 
     return configuracao;
@@ -569,12 +735,13 @@ function configuracaoTodasUsinasDark(agrupado) {
 function atualizarPainelDark() {
     const agrupado = agruparDark(dadosDark.serie, inicioDark, dadosDark.fim, dadosDark.producaoEstimada);
     const quantidade = diasDark(inicioDark, dadosDark.fim);
+    atualizarResumoDespesasCategoriasDark(agrupado);
 
     for (const chave of ['energia', 'horas', 'despesas', 'diarias']) {
         document.getElementById('total-' + chave).textContent = agrupado.totais[chave].toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    for (const chave of ['energia', 'energia-acumulada', 'comparativo', 'acumulado', 'despesas', 'usinas']) {
+    for (const chave of ['energia', 'energia-acumulada', 'comparativo', 'acumulado', 'despesas', 'usinas', 'categorias-despesas']) {
         if (typeof Chart !== 'undefined') {
             let configuracao;
             if (chave === 'usinas') {
@@ -583,14 +750,20 @@ function atualizarPainelDark() {
                 configuracao = configuracaoEnergiaAcumuladaDark(agrupado, inicioDark, dadosDark.fim);
             } else if (chave === 'acumulado') {
                 configuracao = configuracaoAcumuladaDark(agrupado);
+            } else if (chave === 'categorias-despesas') {
+                configuracao = configuracaoDistribuicaoDespesasDark(agrupado);
             } else {
                 configuracao = configuracaoDark(chave, agrupado);
+            }
+            const canvas = document.getElementById('grafico-' + chave);
+            if (!canvas) {
+                continue;
             }
             if (graficosDark[chave]) {
                 graficosDark[chave].data = configuracao.data;
                 graficosDark[chave].update('none');
             } else {
-                graficosDark[chave] = new Chart(document.getElementById('grafico-' + chave), configuracao);
+                graficosDark[chave] = new Chart(canvas, configuracao);
             }
         }
     }
@@ -676,8 +849,12 @@ function alternarMenuDark() {
  */
 function iniciarDark() {
     dadosDark = JSON.parse(document.getElementById('dados-dark').textContent);
-    document.getElementById('botao-menu-dark').addEventListener('click', alternarMenuDark);
-    document.getElementById('fechar-menu-dark').addEventListener('click', alternarMenuDark);
+    const botaoMenu = document.getElementById('botao-menu-dark');
+    const fecharMenu = document.getElementById('fechar-menu-dark');
+    if (botaoMenu && fecharMenu) {
+        botaoMenu.addEventListener('click', alternarMenuDark);
+        fecharMenu.addEventListener('click', alternarMenuDark);
+    }
     document.getElementById('usina_id').addEventListener('change', selecionarUsinaDark);
 
     if (!dadosDark.usinaId) {

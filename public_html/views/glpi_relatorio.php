@@ -5,7 +5,8 @@ require_once __DIR__ . '/../biblioteca.php';
 exigirLogin();
 
 $LimiteParaMostrar = 0.16;
-$titulo = 'Relatório GLPI';
+$titulo = 'KPI DO GLPI';
+$carregarBibliotecaGraficos = true;
 $meses = [
     '01' => 'Janeiro',
     '02' => 'Fevereiro',
@@ -650,12 +651,8 @@ require __DIR__ . '/../views/header.php';
                         <canvas id="grafico-indicadores" role="img" aria-label="Gráfico de área mensal com as séries de SLA, MTFR e MTTR, em horas"></canvas>
                     </div>
                     <script>
-                        document.addEventListener('DOMContentLoaded', function () {
+                        window.glpiChartReady.then(function () {
                             const canvas = document.getElementById('grafico-indicadores');
-                            if (typeof Chart === 'undefined') {
-                                canvas.insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
-                                return;
-                            }
                             const contexto = canvas.getContext('2d');
                             const criarDegrade = function (cor, opacidade) {
                                 const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
@@ -723,6 +720,8 @@ require __DIR__ . '/../views/header.php';
                                     }
                                 }
                             });
+                        }, function () {
+                            document.getElementById('grafico-indicadores').insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
                         });
                     </script>
                 <?php endif; ?>
@@ -767,12 +766,8 @@ require __DIR__ . '/../views/header.php';
                         </div>
                     </details>
                     <script>
-                        document.addEventListener('DOMContentLoaded', function () {
+                        window.glpiChartReady.then(function () {
                             const canvas = document.getElementById('grafico-sla');
-                            if (typeof Chart === 'undefined') {
-                                canvas.insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
-                                return;
-                            }
                             const contexto = canvas.getContext('2d');
                             const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
                             degrade.addColorStop(0, 'rgba(37, 99, 235, 0.38)');
@@ -817,6 +812,8 @@ require __DIR__ . '/../views/header.php';
                                     }
                                 }
                             });
+                        }, function () {
+                            document.getElementById('grafico-sla').insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
                         });
                     </script>
                 <?php endif; ?>
@@ -870,12 +867,8 @@ require __DIR__ . '/../views/header.php';
                             </div>
                         </details>
                         <script>
-                            document.addEventListener('DOMContentLoaded', function () {
+                            window.glpiChartReady.then(function () {
                                 const canvas = document.getElementById('grafico-mttr');
-                                if (typeof Chart === 'undefined') {
-                                    canvas.insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
-                                    return;
-                                }
                                 const contexto = canvas.getContext('2d');
                                 const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
                                 degrade.addColorStop(0, 'rgba(249, 115, 22, 0.38)');
@@ -920,6 +913,8 @@ require __DIR__ . '/../views/header.php';
                                         }
                                     }
                                 });
+                            }, function () {
+                                document.getElementById('grafico-mttr').insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
                             });
                         </script>
                         <?php endif; ?>
@@ -972,12 +967,8 @@ require __DIR__ . '/../views/header.php';
                         </div>
                     </details>
                     <script>
-                        document.addEventListener('DOMContentLoaded', function () {
+                        window.glpiChartReady.then(function () {
                             const canvas = document.getElementById('grafico-mtfr');
-                            if (typeof Chart === 'undefined') {
-                                canvas.insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
-                                return;
-                            }
                             const contexto = canvas.getContext('2d');
                             const degrade = contexto.createLinearGradient(0, 0, 0, canvas.clientHeight || 360);
                             degrade.addColorStop(0, 'rgba(52, 168, 83, 0.38)');
@@ -1022,6 +1013,8 @@ require __DIR__ . '/../views/header.php';
                                     }
                                 }
                             });
+                        }, function () {
+                            document.getElementById('grafico-mtfr').insertAdjacentHTML('afterend', '<div class="aviso erro" role="alert">Não foi possível carregar a biblioteca do gráfico.</div>');
                         });
                     </script>
                 <?php endif; ?>

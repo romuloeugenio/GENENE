@@ -22,7 +22,17 @@ Para atualizar outra instalação antiga, faça backup e execute, uma única vez
 
 Para atualizar um banco já instalado com a Produção Estimada, execute `C:\xampp\php\php.exe migrations\aplicar_producao_estimada.php` no diretório do projeto. O script cria a tabela se ela ainda não existir.
 
-O teste `C:\xampp\php\php.exe tests/migracao_despesas.php` passou em 9 verificações de preservação de dados e chaves estrangeiras em um banco temporário. A suíte HTTP passou em 150 verificações, e a sincronização do DashDark em 65 verificações JavaScript.
+Para adicionar o nível de usuário em um banco existente, execute `C:\xampp\php\php.exe migrations\aplicar_nivel_usuario.php`. A migração atribui o nível 1 aos usuários atuais; instalações novas já criam a coluna `Nivel_Usuario` com esse padrão. Os níveis disponíveis no formulário são 1 (Administrador), 2 (Gerência), 3 (Operador de usina), 5 (Técnico), 6 (Financeiro) e 7 (Suporte).
+
+O relatório **Relatório GLPI** usa OAuth 2.0 na API v2.3. Configure `api_url`, `glpi_client_id`, `glpi_client_secret`, `glpi_username` e `glpi_password` localmente em `glpi.credentials.php`, arquivo ignorado pelo Git. O teste independente de autenticação e consulta é `php test_glpi_connection.php --allow-http`. O endpoint atual usa HTTP sem criptografia; credenciais e tokens podem ser interceptados na rede, então habilite HTTPS antes de usar em produção. O relatório agrupa os chamados pela data de abertura em 2026 e calcula a média de horas corridas até a solução, incluindo somente chamados solucionados até 31/12/2026. O indicador MTTR permite selecionar as datas inicial e final, calcula o tempo entre o início do atendimento (`takeintoaccountdate` ou `date_assign`) e a baixa (`date_close`, `closedate` ou `date_solve`) e mostra a média por dia, semana ou mês conforme o intervalo.
+
+O teste inicial da API REST do Zabbix é `php test_zabbix_connection.php`. Configure o endereço completo que termina em `/api_jsonrpc.php` em `zabbix.credentials.php`, arquivo ignorado pelo Git. O script chama `apiinfo.version` via JSON-RPC e informa o status HTTP e a versão da API; esse teste não exige usuário, senha ou token. Para consultar problemas não resolvidos por período, configure `username` e `password` no arquivo local `zabbix.json` (também ignorado pelo Git), no formato `{"username":"seu_usuario","password":"sua_senha"}`, e acesse **Problemas Zabbix** pelo menu, que abre `public_html/views/zabbix_ticket.php`. A página lê essas credenciais diretamente do arquivo e encerra a sessão de API após a consulta. Para uma instalação HTTP, confirme o risco executando `php test_zabbix_connection.php --allow-http`; HTTPS é recomendado. Como a instância configurada usa HTTP, as credenciais trafegam sem criptografia pela rede.
+
+Para consultar tickets da Auvo em um período, preencha `api_key` e `api_token` em `auvo.credentials.php`, arquivo ignorado pelo Git, e acesse **Autenticar Auvo** como administrador. Selecione as datas inicial e final. A página envia as credenciais em JSON para `https://api.auvo.com.br/v2/login`, lê o campo `token` (com suporte alternativo a `result.accessToken`), grava o token em `auvo.tokens.json` e consulta `/tickets` e `/tasks` com `paramFilter` para o período selecionado, percorrendo as páginas. Os horários de atendimento vêm das tarefas relacionadas ao ticket por `ticketId`: primeira entrada (`checkInDate`) e última saída (`checkOutDate`). O arquivo do token é ignorado pelo Git e fica fora da pasta pública; o token não é exibido na página.
+
+Para gerar a página HTML dos chamados abertos de 01/08/2026 a 31/08/2026, com abertura, fechamento e horas corridas até o fechamento, execute `php chamados_glpi_agosto_2026.php --allow-http > chamados_agosto_2026.html` e abra esse arquivo no navegador. Chamados ainda abertos aparecem sem data de fechamento e sem duração.
+
+O teste `C:\xampp\php\php.exe tests/migracao_despesas.php` passou em 9 verificações de preservação de dados e chaves estrangeiras em um banco temporário. A suíte HTTP contém 175 verificações; as verificações do schema, migração, cadastro/edição do nível de usuário, visibilidade de menu e estado de configuração do relatório GLPI passaram, mas a execução atual foi interrompida ao testar a inclusão de horas extras. A sincronização de DashDark e Dash Select passou em 80 verificações JavaScript.
 
 Acesse **http://localhost/gerene/**.
 
@@ -38,6 +48,7 @@ Esta versão foi reescrita em PHP procedural, seguindo a organização dos exemp
 Apache e MySQL do XAMPP devem permanecer iniciados. A pasta `C:\xampp\htdocs\gerene` é uma junção para `C:\Users\romulo.er\GERENE\public_html`. Os arquivos continuam no projeto aberto no editor: salvar uma alteração e atualizar o navegador basta.
 
 O sistema utiliza o banco `gerene_local`. Cadastre usinas, técnicos e categorias; depois registre produção e despesas. As alterações de estrutura preservam os dados já existentes.
+
 
 O XAMPP encontrado nesta máquina usa PHP 8.0.30 e MariaDB 10.4.32. O código funciona nesse ambiente e também utiliza sintaxe compatível com PHP 8.1+. Nenhuma versão do PHP da máquina foi alterada.
 
@@ -69,6 +80,8 @@ Para entender o fluxo, comece por `views/usinas/usinas.php`: carregamento do reg
 
 - `pode_editar = S` permite incluir e editar. `pode_excluir = S` permite excluir. A validação é feita também no servidor.
 - A gestão de usuários exige as duas permissões. Não é permitido excluir o próprio usuário nem retirar as permissões do último gestor.
+- `Nivel_Usuario` aceita 1 (Administrador), 2 (Gerência), 3 (Operador de usina), 5 (Técnico), 6 (Financeiro) ou 7 (Suporte). Novos usuários e registros migrados recebem nível 1 por padrão.
+- A opção **Usuários** só aparece nos menus para o nível 1 (Administrador), além de exigir as permissões de edição e exclusão já existentes.
 - Senhas são armazenadas com hash. Senha em branco ao editar mantém a atual. Novas senhas devem ter entre 8 e 72 bytes. Troque a senha inicial após entrar.
 - Sessões expiram após 30 minutos sem atividade. Todos os POSTs usam token CSRF.
 - CPF, e-mail, datas, números e vínculos são validados. CPF e e-mail são únicos. Há um lançamento de produção por usina/data.
@@ -98,17 +111,17 @@ Execute no diretório do projeto:
 C:\xampp\php\php.exe tests\integration.php
 ```
 
-A suíte passou em **150 verificações**, usando o PHP do XAMPP. Ela cria um banco `gerene_teste_<aleatório>`, testa login, CRUD, validações, permissões, proteção CSRF/XSS/SQL injection e agregações dos dois dashboards, e remove somente esse banco ao terminar. Também verifica login, listagens, arquivos estáticos e bloqueio HTTP de arquivos internos no Apache real. Essa última parte pressupõe o administrador inicial ainda com a senha `admin`.
+A suíte contém **175 verificações**, usando o PHP do XAMPP. Ela cria um banco `gerene_teste_<aleatório>`, testa login, CRUD, validações, permissões, proteção CSRF/XSS/SQL injection e agregações dos dashboards, e remove somente esse banco ao terminar. Também verifica login, listagens, arquivos estáticos e bloqueio HTTP de arquivos internos no Apache real. Essa última parte pressupõe o administrador inicial ainda com a senha `admin`.
 
 Os arquivos PHP alterados passaram na verificação de sintaxe do PHP do XAMPP. A etapa atual é local; nenhuma publicação na Hostinger foi realizada.
 
 Os cadastros usam o nome da pasta: o formulário é <pasta>.php e a listagem é index_<pasta>.php. Exemplo: horas_extras/horas_extras.php e horas_extras/index_horas_extras.php.
 
-## Novo dashboard: DashDark
+## DashDark e Dash Select
 
-O DashDark é a página inicial após o login e está em **http://localhost/gerene/views/dashdark.php**. O menu lateral oferece **DashDark** e **Dashboard**; o segundo mantém o painel clássico.
+O DashDark é a página inicial após o login e está em **http://localhost/gerene/views/dashdark.php**. O menu também oferece **Dash Select**, uma cópia do DashDark que mantém o mesmo layout, filtros e gráficos, alterando apenas a paleta escura para clara.
 
-O novo layout usa Tailwind via CDN diretamente no HTML, com tema escuro independente de `custom.css`. A referência de organização visual é o [Vireo](https://vireo.jawad.work/src/html/dashboards/hr.html), adaptada aos dados de usinas. O gráfico principal usa [linha com preenchimento no Chart.js](https://www.chartjs.org/docs/latest/charts/line.html) para produção de energia em mWh. Logo abaixo, Produção Acumulada da Usina usa o mesmo estilo com a produção realizada e estimada acumuladas desde 01/01 do ano até a data final selecionada. O painel comparativo usa DIARIAS em barras no eixo esquerdo e HORAS EXTRAS, MATERIAIS (4), SERVIÇOS (5) e MAT/SERVIÇO (6) em linhas no eixo direito, todos em R$. O painel seguinte acumula essas cinco séries em linhas desde o início do período. Abaixo, outro gráfico mostra as despesas totais de todas as categorias.
+Os dois painéis mantêm a mesma composição Tailwind via CDN; DashDark usa tema escuro e Dash Select aplica tema claro. O gráfico principal usa [linha com preenchimento no Chart.js](https://www.chartjs.org/docs/latest/charts/line.html) para produção de energia em mWh. Logo abaixo, Produção Acumulada da Usina usa o mesmo estilo com a produção realizada e estimada acumuladas desde 01/01 do ano até a data final selecionada. O painel comparativo usa DIARIAS em barras no eixo esquerdo e HORAS EXTRAS, MATERIAIS (4), SERVIÇOS (5) e MAT/SERVIÇO (6) em linhas no eixo direito, todos em R$. O painel seguinte acumula essas cinco séries em linhas desde o início do período. Em ambos os temas, os painéis de despesas totais e da distribuição de despesas por categoria aparecem lado a lado; a distribuição lista os valores por categoria e apresenta o total do período em um card.
 
 1. Escolha as datas no formato **DD/MM/AAAA** e a usina no topo. O período inicial é de 01/01/2026 a 31/12/2026. Todas as usinas cadastradas estão disponíveis; a UEG (ID 2) é selecionada inicialmente, ou a primeira usina se a UEG não estiver cadastrada.
 2. Clique em **Aplicar período**. Alterar a usina também aplica o formulário automaticamente quando JavaScript está ativo.
@@ -121,7 +134,7 @@ O limite de um ano corresponde a **365 dias inclusivos**, também em anos bissex
 
 Sem lançamentos, os gráficos mostram zeros e a tabela informa a ausência de registros. Sem usinas, há um estado vazio com acesso ao cadastro. Sem JavaScript ou Chart.js, os totais e a tabela inicial continuam disponíveis. A versão clássica conserva suas regras de período anteriores.
 
-Além dos testes HTTP, **46 verificações JavaScript** em `tests/dashdark.test.js` passaram em contexto isolado com DOM e Chart.js simulados. Elas cobrem anos bissextos, limites, meses parciais, estimativas de produção, botões de período, atualização dos gráficos, totais, tabela e URL. A conferência visual por navegador não foi concluída porque o conector disponível solicitou nova autenticação.
+Além dos testes HTTP, **80 verificações JavaScript** em `tests/dashdark.test.js` passaram em contexto isolado com DOM e Chart.js simulados. Elas cobrem anos bissextos, limites, meses parciais, estimativas de produção, botões de período, atualização dos gráficos, totais, tabela e URL. A conferência visual por navegador não foi concluída porque o conector disponível solicitou nova autenticação.
 
 ## Massa de teste de Horas Extras
 
@@ -133,4 +146,4 @@ Nos dashboards claro e escuro, o comparativo usa DIARIAS em barras no eixo esque
 
 Abaixo dele, Despesas Totais mostra todas as categorias em barras e inclui a produção de energia da tabela `producao_energia` como área no eixo direito de mWh, usando o mesmo período e usina. Os botões 7D, 30D, 3M, 6M e 1A atualizam todos os gráficos: no DashDark sem recarregar, no dashboard claro aplicando o filtro GET. A roda do mouse continua sem alterar o período.
 
-Validação: 150 verificações HTTP e 65 verificações JavaScript, além da conferência das séries, acumulação anual de produção e eixos dos gráficos claro e escuro. Nenhum lançamento do banco foi alterado.
+Validação desta alteração: sintaxe PHP validada; os testes confirmaram que o nível 1 vê a opção Usuários e que o nível 5 não a vê nos menus. O menu GLPI e a página sem tokens também foram testados sem abrir conexão externa. A suíte HTTP continua interrompendo no caso de inclusão de horas extras antes de completar as 175 verificações.

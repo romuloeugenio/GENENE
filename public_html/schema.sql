@@ -8,6 +8,7 @@ CREATE TABLE usuarios (
     email VARCHAR(190) NOT NULL,
     senha_hash VARCHAR(255) NOT NULL,
     administrador VARCHAR(1) NOT NULL DEFAULT 'N',
+    Nivel_Usuario VARCHAR(1) NOT NULL DEFAULT '1',
     pode_editar ENUM('S', 'N') NOT NULL DEFAULT 'N',
     pode_excluir ENUM('S', 'N') NOT NULL DEFAULT 'N',
     criado_em TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -115,11 +116,12 @@ CREATE TABLE despesas (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Usuário inicial. Senha: admin.
-INSERT INTO usuarios (nome, email, senha_hash, pode_editar, pode_excluir)
+INSERT INTO usuarios (nome, email, senha_hash, Nivel_Usuario, pode_editar, pode_excluir)
 VALUES (
     'Administrador',
     'admin@usina.com',
     '$2y$12$Vvvjkm3RKtN15XhGN05rm.Dh1gWWCCGYNpSJclntuZykW.PJmERm6',
+    '1',
     'S',
     'S'
 );
