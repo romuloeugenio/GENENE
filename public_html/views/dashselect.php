@@ -236,10 +236,10 @@ $dados = [
 
 $diasVisiveis = (new DateTimeImmutable($inicio))->diff($dataFinal)->days + 1;
 $links = [
-    ['DashDark', 'views/dashdark.php', '◈'],
     ['Dash Select', 'views/dashselect.php', '▧'],
     ['Dashboard', 'views/dashboard.php', '▦'],
     ['Dashboard GLPI', 'views/glpi_relatorio.php', '◉'],
+    ['Dash Zabbix', 'views/zabbix_disponibilidade.php', '◉'],
     ['Usinas', 'views/usinas/index_usinas.php', '☀'],
     ['Técnicos', 'views/tecnicos/index_tecnicos.php', '♙'],
     ['Produção de Energia', 'views/producao/index_producao.php', 'ϟ'],

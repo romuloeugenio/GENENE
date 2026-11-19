@@ -236,7 +236,6 @@ $dados = [
 
 $diasVisiveis = (new DateTimeImmutable($inicio))->diff($dataFinal)->days + 1;
 $links = [
-    ['DashDark', 'views/dashdark.php', '◈'],
     ['Dash Select', 'views/dashselect.php', '▧'],
     ['Dashboard', 'views/dashboard.php', '▦'],
     ['Usinas', 'views/usinas/index_usinas.php', '☀'],
@@ -267,7 +266,7 @@ if (ehAdministrador() && podeEditar() && podeExcluir()) {
         <!-- Layout independente: o dashboard clássico mantém os estilos anteriores. -->
         <aside id="menu-dark" class="fixed inset-y-0 left-0 z-40 hidden w-60 flex-col border-r border-white/5 bg-[#151722] px-4 py-7 lg:flex">
             <button id="fechar-menu-dark" type="button" class="mb-5 self-end rounded-lg border border-white/10 px-3 py-2 text-xs lg:hidden">Fechar menu</button>
-            <a href="<?= escapar(endereco('views/dashdark.php')) ?>" class="mb-10 flex items-center gap-3 px-3">
+            <a href="<?= escapar(endereco('views/dashselect.php')) ?>" class="mb-10 flex items-center gap-3 px-3">
                 <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500 text-xl font-bold text-white">ϟ</span>
                 <span class="text-xl font-bold tracking-widest text-white">GERENE</span>
             </a>
@@ -276,8 +275,7 @@ if (ehAdministrador() && podeEditar() && podeExcluir()) {
                 <?php foreach ($links as $link): ?>
                     <a
                         href="<?= escapar(endereco($link[1])) ?>"
-                        class="flex items-center gap-3 rounded-lg px-3 py-3 text-xs font-medium transition <?= $link[0] === 'DashDark' ? 'bg-violet-500/15 text-violet-300' : 'text-slate-400 hover:bg-white/5 hover:text-white' ?>"
-                        <?= $link[0] === 'DashDark' ? 'aria-current="page"' : '' ?>
+                        class="flex items-center gap-3 rounded-lg px-3 py-3 text-xs font-medium text-slate-400 transition hover:bg-white/5 hover:text-white"
                     >
                         <span class="w-5 text-center text-lg" aria-hidden="true"><?= $link[2] ?></span>
                         <?= escapar($link[0]) ?>

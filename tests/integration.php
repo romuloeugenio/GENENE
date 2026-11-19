@@ -107,7 +107,7 @@ function entrar($email, $senha)
     ]);
 
     conferir($resposta['status'] === 303, 'Login de ' . $email);
-    conferir(strpos($resposta['cabecalho'], 'views/dashdark.php') !== false, 'DashDark é a página de entrada');
+    conferir(strpos($resposta['cabecalho'], 'views/dashselect.php') !== false, 'Dash Select é a página de entrada');
 
     return tokenDaPagina(requisitar('views/dashboard.php'));
 }
@@ -210,6 +210,7 @@ try {
     );
     $menuAdmin = requisitar('views/dashboard.php')['corpo'];
     conferir(strpos($menuAdmin, 'views/glpi_relatorio.php') !== false, 'Menu autenticado oferece relatório GLPI');
+    conferir(strpos($menuAdmin, 'views/auvo_autenticar.php') === false, 'Sidebar oculta Autenticar Auvo');
     $paginaGlpi = requisitar('views/glpi_relatorio.php');
     conferir(
         $paginaGlpi['status'] === 200
@@ -615,8 +616,23 @@ try {
     conferir(requisitar('views/dashdark.php?usina_id=999')['status'] === 400, 'Usina inexistente rejeitada no DashDark');
     conferir(requisitar('views/dashdark.php?usina_id=1%20OR%201=1')['status'] === 400, 'ID malformado rejeitado no DashDark');
     conferir(strpos(requisitar('views/dashdark.php?inicio=2026-02-30')['corpo'], 'Período inválido') !== false, 'Datas inválidas no DashDark');
-    conferir(strpos(requisitar('index.php')['cabecalho'], 'views/dashdark.php') !== false, 'Sessão existente abre DashDark');
-    conferir(strpos(requisitar('views/dashboard.php')['corpo'], 'views/dashdark.php') !== false, 'Menu clássico oferece DashDark');
+    conferir(strpos(requisitar('index.php')['cabecalho'], 'views/dashselect.php') !== false, 'Sessão existente abre Dash Select');
+    $menuDashboard = requisitar('views/dashboard.php')['corpo'];
+    conferir(
+        strpos($menuDashboard, 'views/dashdark.php') === false
+        && strpos($menuDashboard, 'views/dashselect.php') !== false,
+        'Sidebar clássico remove DashDark e oferece Dash Select'
+    );
+    $menuDashSelect = requisitar('views/dashselect.php')['corpo'];
+    conferir(
+        strpos($menuDashSelect, 'views/dashdark.php') === false
+        && strpos($menuDashSelect, 'views/dashselect.php') !== false,
+        'Sidebar do Dash Select não oferece DashDark'
+    );
+    conferir(
+        strpos(requisitar('views/dashdark.php')['corpo'], 'views/dashdark.php') === false,
+        'Sidebar do DashDark não oferece link para ele mesmo'
+    );
     conferir(strpos(requisitar('views/usinas/index_usinas.php')['corpo'], 'Incluir Novo') === false, 'Consulta não exibe inclusão');
     conferir(requisitar('views/usinas/usinas.php?id=1')['status'] === 403, 'Consulta não abre edição');
     conferir(requisitar('views/usinas/usinas.php?id=1', ['token' => $token] + $cadastros['usinas'])['status'] === 403, 'Consulta não grava por POST');

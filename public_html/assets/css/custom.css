@@ -191,6 +191,24 @@ small {
     gap: 10px;
 }
 
+.zabbix-eventos-resumo {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.zabbix-nota-periodo {
+    flex: 1 1 420px;
+    padding: 8px 12px;
+    margin: 0;
+    border-radius: 5px;
+    background: #f0f9ff;
+    color: #334155;
+    line-height: 1.5;
+}
+
 .incluir {
     margin-top: 22px;
 }
@@ -379,6 +397,71 @@ th {
     height: 360px;
 }
 
+.zabbix-painel-kpis {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin-top: 20px;
+}
+
+.zabbix-kpi {
+    min-width: 0;
+    padding: 18px;
+    border: 1px solid #dce4e9;
+    border-top: 4px solid #0284c7;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #f0f9ff, #ffffff);
+}
+
+.zabbix-kpi--abaixo {
+    border-top-color: #ea580c;
+    background: linear-gradient(135deg, #fff7ed, #ffffff);
+}
+
+.zabbix-kpi--meta {
+    border-top-color: #0d9488;
+    background: linear-gradient(135deg, #f0fdfa, #ffffff);
+}
+
+.zabbix-kpi h3 {
+    margin: 0 0 10px;
+    color: #64748b;
+}
+
+.zabbix-kpi__valor {
+    margin: 0;
+    color: #0f172a;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.zabbix-kpi__descricao {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-size: 12px;
+}
+
+.zabbix-grafico-disponibilidade {
+    position: relative;
+    min-height: 360px;
+    width: 70%;
+    margin: 0 auto;
+}
+
+.link-tabela-zabbix {
+    padding: 0;
+    border: 0;
+    background: transparent;
+    color: #0f766e;
+    font-weight: bold;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-tabela-zabbix:hover {
+    color: #115e59;
+}
+
 details {
     margin-top: 24px;
 }
@@ -448,6 +531,14 @@ summary {
 
     .campos {
         grid-template-columns: 1fr;
+    }
+
+    .zabbix-painel-kpis {
+        grid-template-columns: 1fr;
+    }
+
+    .zabbix-grafico-disponibilidade {
+        width: 100%;
     }
 
     .barra-superior {

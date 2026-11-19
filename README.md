@@ -28,7 +28,7 @@ O relatório **Relatório GLPI** usa OAuth 2.0 na API v2.3. Configure `api_url`,
 
 O teste inicial da API REST do Zabbix é `php test_zabbix_connection.php`. Configure o endereço completo que termina em `/api_jsonrpc.php` em `zabbix.credentials.php`, arquivo ignorado pelo Git. O script chama `apiinfo.version` via JSON-RPC e informa o status HTTP e a versão da API; esse teste não exige usuário, senha ou token. Para consultar problemas não resolvidos por período, configure `username` e `password` no arquivo local `zabbix.json` (também ignorado pelo Git), no formato `{"username":"seu_usuario","password":"sua_senha"}`, e acesse **Problemas Zabbix** pelo menu, que abre `public_html/views/zabbix_ticket.php`. A página lê essas credenciais diretamente do arquivo e encerra a sessão de API após a consulta. Para uma instalação HTTP, confirme o risco executando `php test_zabbix_connection.php --allow-http`; HTTPS é recomendado. Como a instância configurada usa HTTP, as credenciais trafegam sem criptografia pela rede.
 
-Para consultar tickets da Auvo em um período, preencha `api_key` e `api_token` em `auvo.credentials.php`, arquivo ignorado pelo Git, e acesse **Autenticar Auvo** como administrador. Selecione as datas inicial e final. A página envia as credenciais em JSON para `https://api.auvo.com.br/v2/login`, lê o campo `token` (com suporte alternativo a `result.accessToken`), grava o token em `auvo.tokens.json` e consulta `/tickets` e `/tasks` com `paramFilter` para o período selecionado, percorrendo as páginas. Os horários de atendimento vêm das tarefas relacionadas ao ticket por `ticketId`: primeira entrada (`checkInDate`) e última saída (`checkOutDate`). O arquivo do token é ignorado pelo Git e fica fora da pasta pública; o token não é exibido na página.
+Para consultar tickets da Auvo em um período, preencha `api_key` e `api_token` em `auvo.credentials.php`, arquivo ignorado pelo Git, e acesse diretamente `views/auvo_autenticar.php` como administrador; a página não aparece nos sidebars. Selecione as datas inicial e final. A página envia as credenciais em JSON para `https://api.auvo.com.br/v2/login`, lê o campo `token` (com suporte alternativo a `result.accessToken`), grava o token em `auvo.tokens.json` e consulta `/tickets` e `/tasks` com `paramFilter` para o período selecionado, percorrendo as páginas. Os horários de atendimento vêm das tarefas relacionadas ao ticket por `ticketId`: primeira entrada (`checkInDate`) e última saída (`checkOutDate`). O arquivo do token é ignorado pelo Git e fica fora da pasta pública; o token não é exibido na página.
 
 Para gerar a página HTML dos chamados abertos de 01/08/2026 a 31/08/2026, com abertura, fechamento e horas corridas até o fechamento, execute `php chamados_glpi_agosto_2026.php --allow-http > chamados_agosto_2026.html` e abra esse arquivo no navegador. Chamados ainda abertos aparecem sem data de fechamento e sem duração.
 
@@ -59,7 +59,7 @@ O XAMPP encontrado nesta máquina usa PHP 8.0.30 e MariaDB 10.4.32. O código fu
 | `public_html/config.php` | Banco, nome da empresa, endereço `/gerene` e sessão. |
 | `public_html/db.php` | Função de conexão PDO. |
 | `public_html/biblioteca.php` | Funções comuns de sessão, permissões, validação e formatação. |
-| `public_html/index.php` | Login. Após autenticar, abre o DashDark. |
+| `public_html/index.php` | Login. Após autenticar, abre o Dash Select. |
 | `public_html/logout.php` | Encerra a sessão por POST. |
 | `public_html/views/usinas/index_usinas.php` | Consulta, tabela e exclusão de usinas. |
 | `public_html/views/usinas/usinas.php` | Recebe os campos, valida, inclui/edita e mostra o formulário. |
@@ -119,7 +119,7 @@ Os cadastros usam o nome da pasta: o formulário é <pasta>.php e a listagem é 
 
 ## DashDark e Dash Select
 
-O DashDark é a página inicial após o login e está em **http://localhost/gerene/views/dashdark.php**. O menu também oferece **Dash Select**, uma cópia do DashDark que mantém o mesmo layout, filtros e gráficos, alterando apenas a paleta escura para clara.
+O Dash Select é a página inicial após o login. O DashDark permanece acessível diretamente em **http://localhost/gerene/views/dashdark.php**, mas não aparece nos sidebars. O Dash Select mantém o mesmo layout, filtros e gráficos do DashDark, alterando a paleta escura para clara.
 
 Os dois painéis mantêm a mesma composição Tailwind via CDN; DashDark usa tema escuro e Dash Select aplica tema claro. O gráfico principal usa [linha com preenchimento no Chart.js](https://www.chartjs.org/docs/latest/charts/line.html) para produção de energia em mWh. Logo abaixo, Produção Acumulada da Usina usa o mesmo estilo com a produção realizada e estimada acumuladas desde 01/01 do ano até a data final selecionada. O painel comparativo usa DIARIAS em barras no eixo esquerdo e HORAS EXTRAS, MATERIAIS (4), SERVIÇOS (5) e MAT/SERVIÇO (6) em linhas no eixo direito, todos em R$. O painel seguinte acumula essas cinco séries em linhas desde o início do período. Em ambos os temas, os painéis de despesas totais e da distribuição de despesas por categoria aparecem lado a lado; a distribuição lista os valores por categoria e apresenta o total do período em um card.
 

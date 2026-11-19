@@ -4,7 +4,7 @@ require_once __DIR__ . '/biblioteca.php';
 
 if (!empty($_SESSION['usuario_id'])) {
     exigirLogin();
-    redirecionar('views/dashdark.php');
+    redirecionar('views/dashselect.php');
 }
 
 $erro = '';
@@ -33,7 +33,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 'pode_excluir' => $usuario['pode_excluir'],
                 'ultima_atividade' => time()
             ];
-            redirecionar('views/dashdark.php');
+            redirecionar('views/dashselect.php');
         }
 
         $_SESSION['tentativas'] = ($_SESSION['tentativas'] ?? 0) + 1;
